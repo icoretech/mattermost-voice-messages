@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <p align="center">
-  <img src=".github/assets/screenshot.png" alt="Mattermost Voice Messages screenshot" width="803" />
+  <img src=".github/assets/screenshot.png" alt="Mattermost Voice Messages screenshot" width="838" />
 </p>
 
 WhatsApp-style voice messages for Mattermost channels and threads.
