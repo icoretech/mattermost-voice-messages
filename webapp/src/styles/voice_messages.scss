@@ -1,0 +1,392 @@
+.VoiceRecorderAction {
+  color: inherit;
+  font-size: 13px;
+}
+
+.VoiceRecorderAction__button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.72);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  margin: 0 1px;
+  padding: 0;
+  width: 28px;
+}
+
+.VoiceRecorderAction__micIcon {
+  display: inline-flex;
+  height: 18px;
+  width: 18px;
+}
+
+.VoiceRecorderAction__micIcon svg {
+  height: 18px;
+  width: 18px;
+}
+
+
+.VoiceRecorderAction__button:hover,
+.VoiceRecorderAction__button:focus-visible {
+  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.08);
+  color: var(--button-bg, currentColor);
+}
+
+.VoiceRecorderAction__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+
+.VoiceRecorderAction__panel {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.84);
+  display: inline-flex;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0 4px;
+}
+
+.VoiceRecorderAction__panel--review {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  gap: 4px;
+  padding: 0;
+}
+
+.VoiceRecorderAction__panel--recording {
+  gap: 6px;
+}
+
+.VoiceRecorderAction__panel--error {
+  border-color: rgba(var(--error-text-color-rgb, 210, 75, 78), 0.32);
+  color: var(--error-text, currentColor);
+}
+
+.VoiceRecorderAction__recordingDot {
+  animation: VoiceRecorderPulse 1s ease-in-out infinite;
+  background: var(--error-text, #d24b4e);
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.VoiceRecorderAction__timer {
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+}
+
+.VoiceRecorderAction__recordingLabel {
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.56);
+  font-size: 12px;
+}
+
+.VoiceRecorderAction__iconButton,
+.VoiceRecorderAction__sendButton {
+  align-items: center;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  justify-content: center;
+}
+
+.VoiceRecorderAction__iconButton {
+  background: transparent;
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.72);
+  height: 24px;
+  position: relative;
+  width: 24px;
+}
+
+.VoiceRecorderAction__iconButton:hover,
+.VoiceRecorderAction__iconButton:focus-visible {
+  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.16);
+}
+
+.VoiceRecorderAction__iconButton--stop::before {
+  background: var(--error-text, #d24b4e);
+  border-radius: 3px;
+  content: "";
+  height: 9px;
+  width: 9px;
+}
+
+.VoiceRecorderAction__iconButton--cancel::before,
+.VoiceRecorderAction__iconButton--cancel::after {
+  background: currentColor;
+  border-radius: 2px;
+  content: "";
+  height: 14px;
+  position: absolute;
+  width: 2px;
+}
+
+.VoiceRecorderAction__iconButton--cancel::before {
+  transform: rotate(45deg);
+}
+
+.VoiceRecorderAction__iconButton--cancel::after {
+  transform: rotate(-45deg);
+}
+
+.VoiceRecorderAction__sendButton {
+  background: var(--button-bg, #1c58d9);
+  color: var(--button-color, #fff);
+  min-height: 28px;
+  padding: 0 12px;
+}
+
+.VoiceRecorderAction__sendButton:hover,
+.VoiceRecorderAction__sendButton:focus-visible {
+  filter: brightness(0.96);
+}
+
+.VoiceRecorderAction__spinner {
+  animation: VoiceRecorderSpin 0.8s linear infinite;
+  border: 2px solid rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.18);
+  border-top-color: var(--button-bg, currentColor);
+  border-radius: 50%;
+  height: 14px;
+  width: 14px;
+}
+
+.VoiceMessagePost {
+  align-items: center;
+  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.04);
+  border: 1px solid rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.12);
+  border-radius: 18px;
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.88);
+  display: inline-flex;
+  gap: 10px;
+  max-width: min(430px, 100%);
+  min-width: min(320px, 100%);
+  padding: 8px 10px;
+}
+
+.post__body:has(.VoiceMessagePost:not(.VoiceMessagePost--fallback)) [data-testid="fileAttachmentList"] {
+  display: none;
+}
+
+.VoiceMessagePost--compact {
+  max-width: min(360px, 100%);
+  min-width: min(280px, 100%);
+  padding: 6px 8px;
+}
+
+.VoiceMessagePost--preview {
+  border-radius: 999px;
+  box-shadow: none;
+  gap: 6px;
+  height: 28px;
+  max-width: 116px;
+  min-width: 0;
+  padding: 2px 7px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__playButton {
+  height: 22px;
+  width: 22px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__playIcon {
+  border-bottom-width: 5px;
+  border-left-width: 8px;
+  border-top-width: 5px;
+  margin-left: 2px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__pauseIcon {
+  border-left-width: 3px;
+  border-right-width: 3px;
+  height: 10px;
+  width: 9px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__body {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__scrubberLabel,
+.VoiceMessagePost--preview .VoiceMessagePost__speedControls {
+  display: none;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__meta {
+  gap: 0;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__timeline {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.VoiceMessagePost--fallback {
+  min-width: 0;
+}
+
+.VoiceMessagePost__playButton {
+  align-items: center;
+  background: var(--button-bg, #1c58d9);
+  border: 0;
+  border-radius: 50%;
+  color: var(--button-color, #fff);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.VoiceMessagePost__playButton:hover,
+.VoiceMessagePost__playButton:focus-visible {
+  filter: brightness(0.96);
+}
+
+.VoiceMessagePost__playIcon {
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid currentColor;
+  border-top: 7px solid transparent;
+  height: 0;
+  margin-left: 3px;
+  width: 0;
+}
+
+.VoiceMessagePost__pauseIcon {
+  border-left: 4px solid currentColor;
+  border-right: 4px solid currentColor;
+  height: 14px;
+  width: 12px;
+}
+
+.VoiceMessagePost__body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.VoiceMessagePost__scrubberLabel {
+  cursor: pointer;
+  display: grid;
+  min-width: 0;
+  position: relative;
+}
+
+.VoiceMessagePost__waveform {
+  align-items: center;
+  display: grid;
+  gap: 2px;
+  grid-template-columns: repeat(24, minmax(2px, 1fr));
+  height: 28px;
+  overflow: hidden;
+  position: relative;
+}
+
+.VoiceMessagePost__waveformBar {
+  align-self: center;
+  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.24);
+  border-radius: 999px;
+  display: block;
+  min-height: 3px;
+  transition: background 120ms ease;
+}
+
+.VoiceMessagePost__waveformBar--active {
+  background: var(--button-bg, currentColor);
+}
+
+.VoiceMessagePost__scrubber {
+  cursor: pointer;
+  inset: 0;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.VoiceMessagePost__meta {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.VoiceMessagePost__timeline {
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.64);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.VoiceMessagePost__speedControls {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.VoiceMessagePost__speedButton {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.64);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+}
+
+.VoiceMessagePost__speedButton:hover,
+.VoiceMessagePost__speedButton:focus-visible,
+.VoiceMessagePost__speedButton[aria-pressed="true"] {
+  background: rgba(var(--button-bg-rgb, 28, 88, 217), 0.12);
+  color: var(--button-bg, currentColor);
+}
+
+.VoiceMessagePost__audio {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.VoiceMessagePost__srOnly {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@keyframes VoiceRecorderPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes VoiceRecorderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

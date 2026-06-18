@@ -1,0 +1,26 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "include-v-in-tag": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "generic",
+          "path": "server/manifest.go"
+        },
+        {
+          "type": "generic",
+          "path": "webapp/src/manifest.ts"
+        }
+      ]
+    }
+  }
+}

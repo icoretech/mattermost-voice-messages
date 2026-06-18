@@ -1,0 +1,98 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["github-actions", "npm", "gomod", "custom.regex"],
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "platformAutomerge": false,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 10,
+  "rebaseWhen": "conflicted",
+  "rangeStrategy": "bump",
+  "timezone": "Europe/Rome",
+  "packageRules": [
+    {
+      "description": "Group Vite ecosystem updates",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "/^vite$/",
+        "/^@vitejs\\//",
+        "/^vitest$/",
+        "/^vite-plugin-/"
+      ],
+      "groupName": "vite-ecosystem",
+      "groupSlug": "vite-ecosystem"
+    },
+    {
+      "description": "Group Biome and TypeScript tooling",
+      "matchManagers": ["npm", "custom.regex"],
+      "matchPackageNames": [
+        "/^@biomejs\\//",
+        "/^typescript$/"
+      ],
+      "groupName": "lint-tooling",
+      "groupSlug": "lint-tooling"
+    },
+    {
+      "description": "Group React ecosystem updates",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "/^react$/",
+        "/^react-dom$/",
+        "/^@types\\/react$/",
+        "/^@types\\/react-dom$/",
+        "/^react-redux$/"
+      ],
+      "groupName": "react-ecosystem",
+      "groupSlug": "react-ecosystem"
+    },
+    {
+      "description": "Group Mattermost SDK updates",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "/^@mattermost\\//",
+        "/^mattermost-/"
+      ],
+      "groupName": "mattermost-sdk",
+      "groupSlug": "mattermost-sdk"
+    },
+    {
+      "description": "Group Go Mattermost dependencies",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "/^github\\.com\\/mattermost\\//",
+        "/^github\\.com\\/gorilla\\//",
+        "/^github\\.com\\/google\\/uuid$/"
+      ],
+      "groupName": "go-mattermost",
+      "groupSlug": "go-mattermost"
+    },
+    {
+      "description": "Group Go standard library updates",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "/^golang\\.org\\//",
+        "/^google\\.golang\\.org\\//",
+        "/^github\\.com\\/golang\\//",
+        "/^github\\.com\\/pkg\\/errors$/"
+      ],
+      "groupName": "go-stdlib",
+      "groupSlug": "go-stdlib"
+    },
+    {
+      "description": "Automerge non-major updates after checks pass",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)biome\\.json$/"],
+      "matchStrings": ["https://biomejs.dev/schemas/(?<currentValue>[^/]+)/schema.json"],
+      "depNameTemplate": "@biomejs/biome",
+      "datasourceTemplate": "npm"
+    }
+  ]
+}

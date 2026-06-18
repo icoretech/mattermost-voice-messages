@@ -1,0 +1,24 @@
+services:
+  mattermost:
+    image: mattermost/mattermost-preview:latest
+    platform: linux/amd64
+    container_name: mattermost-voice-messages-dev
+    restart: unless-stopped
+    ports:
+      - "${MATTERMOST_DEV_PORT:-18065}:8065"
+    environment:
+      MM_SERVICESETTINGS_SITEURL: "${MATTERMOST_DEV_SITE_URL:-http://localhost:18065}"
+      MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
+      MM_PLUGINSETTINGS_ENABLE: "true"
+      MM_SERVICESETTINGS_ENABLEDEVELOPER: "true"
+      MM_SERVICESETTINGS_ENABLEUSERACCESSTOKENS: "true"
+      MM_LOGSETTINGS_ENABLECONSOLE: "true"
+      MM_LOGSETTINGS_CONSOLELEVEL: "INFO"
+      MM_LOGSETTINGS_FILEJSON: "true"
+    volumes:
+      - mattermost-data:/mm/mattermost-data
+      - mattermost-postgres:/var/lib/postgresql/data
+
+volumes:
+  mattermost-data:
+  mattermost-postgres:

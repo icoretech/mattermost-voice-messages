@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build-and-upload:
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.15.0
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - run: cd webapp && npm ci
+      - run: make dist
+
+      - name: Import GPG key
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Sign plugin bundle
+        run: |
+          for f in dist/*.tar.gz; do
+            gpg --batch --yes \
+                --pinentry-mode loopback \
+                --personal-digest-preferences SHA256 \
+                --detach-sign "$f"
+          done
+
+      - name: Upload release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload --clobber ${{ needs.release-please.outputs.tag_name }} dist/*.tar.gz dist/*.tar.gz.sig
