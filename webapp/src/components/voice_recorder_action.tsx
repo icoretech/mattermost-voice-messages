@@ -371,9 +371,10 @@ function RequestingPermissionButton() {
       className="VoiceRecorderAction__button VoiceRecorderAction__button--pending"
       disabled
       type="button"
-      title="Allow microphone"
+      aria-label="Requesting microphone permission"
+      title="Requesting microphone permission"
     >
-      Allow microphone…
+      <MicIcon />
     </button>
   );
 }

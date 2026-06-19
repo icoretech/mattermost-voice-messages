@@ -164,6 +164,34 @@ describe("VoiceRecorderAction", () => {
     );
   });
 
+  it("shows only the mic icon while waiting for browser permission", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn(() => new Promise(() => undefined)),
+      },
+    });
+    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+
+    render(
+      <VoiceRecorderAction
+        draft={{ channelId: "channel-id" }}
+        getSelectedText={() => ({})}
+        updateText={() => undefined}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Record voice message" }),
+    );
+
+    const pendingButton = await screen.findByRole("button", {
+      name: "Requesting microphone permission",
+    });
+    expect(pendingButton).toHaveTextContent("");
+    expect(pendingButton.querySelector("svg")).toBeInTheDocument();
+  });
+
   it("captures stop time before delayed recorder stop callback", async () => {
     const track = { stop: vi.fn() };
     installRecorderEnvironment(track);
