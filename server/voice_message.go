@@ -101,7 +101,7 @@ func (p *Plugin) handleCreateVoiceMessage(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func parseVoiceMessageRequest(r *http.Request, maxBytes int64) (voiceMessageRequest, *handlerError) {
+func parseVoiceMessageRequest(r *http.Request, maxBytes int64) (parsed voiceMessageRequest, handlerErr *handlerError) {
 	if err := r.ParseMultipartForm(multipartOverheadBytes); err != nil {
 		if strings.Contains(err.Error(), "http: request body too large") {
 			return voiceMessageRequest{}, &handlerError{message: "Voice message too large", status: http.StatusRequestEntityTooLarge}
@@ -137,7 +137,11 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64) (voiceMessageRequ
 	if err != nil {
 		return voiceMessageRequest{}, &handlerError{message: "Missing audio file", status: http.StatusBadRequest}
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil && handlerErr == nil {
+			handlerErr = &handlerError{message: "Could not read audio file", status: http.StatusBadRequest}
+		}
+	}()
 
 	data, handlerErr := readVoiceAudioData(file, maxBytes)
 	if handlerErr != nil {
