@@ -16,7 +16,7 @@ function makePost(props: Post["props"]): Post {
     root_id: "",
     original_id: "",
     message: "",
-    type: "custom_ic_voice_msg" as Post["type"],
+    type: "" as Post["type"],
     props,
     hashtags: "",
     pending_post_id: "",
