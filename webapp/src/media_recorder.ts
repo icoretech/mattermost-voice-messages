@@ -1,7 +1,7 @@
 export const preferredAudioMimeTypes = [
+  "audio/mp4",
   "audio/webm;codecs=opus",
   "audio/ogg;codecs=opus",
-  "audio/mp4",
 ] as const;
 
 export function selectAudioMimeType(): string | undefined {

@@ -21,18 +21,33 @@ describe("media recorder helpers", () => {
     }
   });
 
-  it("selects the first supported preferred MIME type", () => {
+  it("selects WebM after checking and rejecting MP4 first", () => {
     vi.stubGlobal("MediaRecorder", {
       isTypeSupported: vi.fn(
-        (mimeType: string) => mimeType === "audio/ogg;codecs=opus",
+        (mimeType: string) => mimeType === "audio/webm;codecs=opus",
       ),
     });
 
-    expect(selectAudioMimeType()).toBe("audio/ogg;codecs=opus");
+    expect(selectAudioMimeType()).toBe("audio/webm;codecs=opus");
+    expect(MediaRecorder.isTypeSupported).toHaveBeenCalledWith("audio/mp4");
+    expect(MediaRecorder.isTypeSupported).toHaveBeenCalledWith(
+      "audio/webm;codecs=opus",
+    );
+    expect(MediaRecorder.isTypeSupported).not.toHaveBeenCalledWith(
+      "audio/ogg;codecs=opus",
+    );
+  });
+
+  it("selects MP4 without checking later candidates", () => {
+    vi.stubGlobal("MediaRecorder", {
+      isTypeSupported: vi.fn((mimeType: string) => mimeType === "audio/mp4"),
+    });
+
+    expect(selectAudioMimeType()).toBe("audio/mp4");
     expect(MediaRecorder.isTypeSupported).toHaveBeenCalledWith(
       preferredAudioMimeTypes[0],
     );
-    expect(MediaRecorder.isTypeSupported).toHaveBeenCalledWith(
+    expect(MediaRecorder.isTypeSupported).not.toHaveBeenCalledWith(
       preferredAudioMimeTypes[1],
     );
     expect(MediaRecorder.isTypeSupported).not.toHaveBeenCalledWith(

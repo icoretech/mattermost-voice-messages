@@ -157,7 +157,7 @@ describe("VoiceRecorderAction", () => {
     expect(formData.get("channel_id")).toBe("channel-id");
     expect(formData.get("root_id")).toBe("root-id");
     expect(formData.get("duration_ms")).toBe("2000");
-    expect(formData.get("mime_type")).toBe("audio/webm;codecs=opus");
+    expect(formData.get("mime_type")).toBe("audio/mp4");
     expect(formData.get("audio")).toBeInstanceOf(File);
     expect(JSON.parse(String(formData.get("waveform")))).toHaveLength(
       waveformBarCount,
