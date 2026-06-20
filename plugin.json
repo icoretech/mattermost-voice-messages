@@ -2,7 +2,7 @@
     "id": "ch.icorete.mattermost-voice-messages",
     "name": "Mattermost Voice Messages",
     "description": "Record and play voice messages in Mattermost channels and threads.",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "homepage_url": "https://github.com/icoretech/mattermost-voice-messages",
     "support_url": "https://github.com/icoretech/mattermost-voice-messages/issues",
     "release_notes_url": "https://github.com/icoretech/mattermost-voice-messages/releases",
