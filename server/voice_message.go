@@ -12,7 +12,6 @@ import (
 	"github.com/mattermost/mattermost/server/public/model"
 )
 
-const voicePostType = "custom_ic_voice_msg"
 const maxVoiceMessageBytes = 25 * 1024 * 1024
 const multipartOverheadBytes = 1 * 1024 * 1024
 const maxVoiceMessageDurationMS = 6 * 60 * 60 * 1000
@@ -226,33 +225,36 @@ func detectVoiceAudio(contentType string) (mimeType string, extension string, ok
 	}
 }
 
-func buildVoiceMessagePost(userID string, req voiceMessageRequest, fileInfo *model.FileInfo) *model.Post {
+func buildVoiceMessageProps(fileInfo *model.FileInfo, mimeType string, durationMS int64, size int64, waveform []any) map[string]any {
 	filename := fileInfo.Name
 	if filename == "" {
-		filename = "voice-message" + extensionForMime(req.mimeType)
+		filename = "voice-message" + extensionForMime(mimeType)
 	}
 
 	voiceMessage := map[string]any{
 		"version":     1,
 		"file_id":     fileInfo.Id,
 		"filename":    filename,
-		"mime_type":   req.mimeType,
-		"duration_ms": req.durationMS,
-		"size":        int64(len(req.data)),
+		"mime_type":   mimeType,
+		"duration_ms": durationMS,
+		"size":        size,
 	}
-	if len(req.waveform) > 0 {
-		voiceMessage["waveform"] = req.waveform
+	if len(waveform) > 0 {
+		voiceMessage["waveform"] = waveform
 	}
 
+	return voiceMessage
+}
+
+func buildVoiceMessagePost(userID string, req voiceMessageRequest, fileInfo *model.FileInfo) *model.Post {
 	return &model.Post{
 		UserId:    userID,
 		ChannelId: req.channelID,
 		RootId:    req.rootID,
-		Message:   "Voice message",
-		Type:      voicePostType,
+		Message:   "",
 		FileIds:   []string{fileInfo.Id},
 		Props: model.StringInterface{
-			"voice_message": voiceMessage,
+			"voice_message": buildVoiceMessageProps(fileInfo, req.mimeType, req.durationMS, int64(len(req.data)), req.waveform),
 		},
 	}
 }

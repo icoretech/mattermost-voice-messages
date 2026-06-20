@@ -76,10 +76,10 @@ func TestBuildVoiceMessagePost(t *testing.T) {
 	assert.Equal(t, userID, post.UserId)
 	assert.Equal(t, channelID, post.ChannelId)
 	assert.Equal(t, rootID, post.RootId)
-	assert.Equal(t, voicePostType, post.Type)
-	assert.Equal(t, "Voice message", post.Message)
-	assert.Equal(t, fileID, post.FileIds[0])
-
+	assert.Empty(t, post.Type)
+	assert.Empty(t, post.Message)
+	assert.Equal(t, model.StringArray{fileID}, post.FileIds)
+	assert.Len(t, post.Props, 1)
 	voiceMessage, ok := post.Props["voice_message"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, 1, voiceMessage["version"])
@@ -89,6 +89,21 @@ func TestBuildVoiceMessagePost(t *testing.T) {
 	assert.Equal(t, int64(12_345), voiceMessage["duration_ms"])
 	assert.Equal(t, int64(len(req.data)), voiceMessage["size"])
 	assert.Equal(t, []any{0.25, 0.5}, voiceMessage["waveform"])
+}
+
+func TestBuildVoiceMessagePropsUsesFallbackFilenameAndOmitsEmptyWaveform(t *testing.T) {
+	fileID := model.NewId()
+	fileInfo := &model.FileInfo{Id: fileID}
+
+	voiceMessage := buildVoiceMessageProps(fileInfo, "audio/wav", 123, 456, nil)
+
+	assert.Equal(t, 1, voiceMessage["version"])
+	assert.Equal(t, fileID, voiceMessage["file_id"])
+	assert.Equal(t, "voice-message.wav", voiceMessage["filename"])
+	assert.Equal(t, "audio/wav", voiceMessage["mime_type"])
+	assert.Equal(t, int64(123), voiceMessage["duration_ms"])
+	assert.Equal(t, int64(456), voiceMessage["size"])
+	assert.NotContains(t, voiceMessage, "waveform")
 }
 
 func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
@@ -225,7 +240,7 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	channelID := model.NewId()
 	rootID := model.NewId()
 	fileInfo := &model.FileInfo{Id: model.NewId(), Name: "voice-message-1710000000000.webm", Size: 3, MimeType: "audio/webm"}
-	createdPost := &model.Post{Id: model.NewId(), UserId: userID, ChannelId: channelID, RootId: rootID, Type: voicePostType, FileIds: []string{fileInfo.Id}}
+	createdPost := &model.Post{Id: model.NewId(), UserId: userID, ChannelId: channelID, RootId: rootID, FileIds: []string{fileInfo.Id}}
 
 	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
@@ -241,7 +256,15 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	).Return(fileInfo, (*model.AppError)(nil))
 	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
 		voiceMessage, ok := post.Props["voice_message"].(map[string]any)
-		return ok && voiceMessage["waveform"] != nil && post.UserId == userID && post.ChannelId == channelID && post.RootId == rootID && post.Type == voicePostType && post.Message == "Voice message" && len(post.FileIds) == 1 && post.FileIds[0] == fileInfo.Id
+		return ok &&
+			voiceMessage["waveform"] != nil &&
+			post.UserId == userID &&
+			post.ChannelId == channelID &&
+			post.RootId == rootID &&
+			post.Type == "" &&
+			post.Message == "" &&
+			len(post.FileIds) == 1 &&
+			post.FileIds[0] == fileInfo.Id
 	})).Return(createdPost, (*model.AppError)(nil))
 
 	req := newVoiceMultipartRequest(t, map[string]string{
