@@ -1,4 +1,4 @@
 interface:
   display_name: "Mattermost Voice Dev Smoke"
-  short_description: "Boot and smoke-test the voice plugin"
-  default_prompt: "Use $mattermost-voice-dev-smoke to start the local Mattermost dev stack and smoke-test the voice plugin."
+  short_description: "Smoke-test voice plugin and mobile fallback"
+  default_prompt: "Use $mattermost-voice-dev-smoke to start the local Mattermost dev stack and smoke-test browser recording plus native/mobile voice fallback."

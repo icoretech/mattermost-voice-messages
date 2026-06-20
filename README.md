@@ -11,37 +11,32 @@
 
 WhatsApp-style voice messages for Mattermost channels and threads.
 
-The plugin adds a microphone control to the Mattermost composer. Users click to start recording, review the clip, send it as a custom Mattermost post, and play it back with an inline audio player, waveform scrubber, and playback-speed controls.
+The plugin adds a microphone button to Mattermost web and desktop. Users can record a short audio message, listen to it before sending, and post it in a channel or thread.
+
+People reading from Mattermost web, desktop, or a mobile browser get the full voice-message player with waveform and speed controls. People reading from the native Mattermost iOS or Android apps get a regular audio attachment they can play with the mobile app's built-in audio player.
 
 ## Features
 
-- Browser-side voice recording with `MediaRecorder`
-- Composer microphone control beside the native send button
-- Compact pre-send review chip with play and duration
-- Custom voice-message post renderer for channels and threads
-- Inline play/pause controls, waveform scrubber, elapsed/duration display, and playback speeds
-- Client-side waveform peak extraction stored with the post
-- Server-side validation of channel membership, posting permission, upload permission, audio MIME type, size, duration, and waveform shape
-- Mattermost file upload integration with the default attachment preview hidden when the custom player renders successfully
-- No speech-to-text, text-to-speech, transcription, or server-side audio processing
+- Record and send voice messages from Mattermost web and desktop
+- Listen before sending
+- Send voice messages in channels and threads
+- Play messages inline on web, desktop, and mobile browser
+- Change playback speed: `0.5x`, `1x`, `1.5x`, and `2x`
+- Keep received voice messages playable in the native Mattermost mobile apps
+- Show the web player for matching audio files uploaded outside the recorder
+- Respect existing Mattermost posting and file-upload permissions
+- No transcription, speech-to-text, text-to-speech, or server-side audio processing
 
 ## Requirements
 
 - Mattermost Server 8.1+
-- Go 1.26+ for building the server bundle
-- Node.js 24+ for building the webapp bundle
-- A browser that supports `MediaRecorder` for recording
+- File uploads enabled in Mattermost
+- Users need permission to post messages and upload files in the target channel
+- A modern browser with microphone access for recording
 
-Supported upload MIME types:
+The record button is available in Mattermost web, desktop, and mobile browser. Native Mattermost iOS and Android users can listen to received voice messages as audio attachments, but they do not get the plugin's record button.
 
-- `audio/webm`
-- `audio/ogg`
-- `audio/mp4`
-- `audio/mpeg`
-- `audio/wav`
-- `audio/x-wav`
-
-Voice uploads are limited to 25 MiB and 6 hours.
+Voice uploads are limited to 25 MiB and 6 hours. Supported formats are WebM, Ogg, MP4/M4A, MP3, and WAV.
 
 ## Installation
 
@@ -70,12 +65,13 @@ mmctl plugin add key assets/signing-key.asc
 ## Usage
 
 1. Open a channel or thread in Mattermost.
-2. Click the microphone button near the composer send button to start recording.
-3. Click stop to finish recording.
-4. Review the compact preview chip.
-5. Click **Send** to post the voice message, or cancel to discard it.
+2. Click the microphone button next to the composer.
+3. Allow microphone access if the browser asks.
+4. Stop recording when finished.
+5. Review the clip.
+6. Click **Send**, or cancel to discard it.
 
-Sent voice messages render as a custom player. The post player includes a waveform scrubber and playback speeds: `0.5x`, `1x`, `1.5x`, and `2x`.
+On web, desktop, and mobile browser, sent voice messages show the custom voice player. On native Mattermost mobile apps, they show as regular audio attachments without an extra text label above the player.
 
 ## Configuration
 
@@ -90,12 +86,14 @@ Access is inherited from Mattermost permissions:
 
 ## Development
 
-Install dependencies:
+Install build dependencies:
 
 ```bash
 cd webapp
 npm ci
 ```
+
+Development builds require Go 1.26+ and Node.js 24+.
 
 Build the plugin bundle:
 
@@ -133,6 +131,7 @@ make deploy
 ```
 
 `make deploy` builds the plugin, uploads the bundle through the Mattermost API, and enables it.
+
 
 Personal access token authentication is also supported:
 
