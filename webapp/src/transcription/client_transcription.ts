@@ -1,7 +1,7 @@
 import type {
   ClientTranscriptionModel,
   ClientTranscriptionQuantization,
-} from "./client_config";
+} from "../plugin/manifest";
 
 export type LocalTranscriptionProgress = {
   stage: "loading" | "decoding" | "transcribing" | "done";

@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import type { Post } from "@mattermost/types/posts";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
-import { VoicePostComponent } from "./components/voice_post";
+import { VoicePostComponent } from "./voice_post";
 
 function makePost(overrides: Partial<Post> = {}): Post {
   return {
@@ -92,6 +92,22 @@ describe("VoicePostComponent", () => {
       "/api/v4/files/prop-file?t=123",
     );
     expect(screen.getByText("0:00 / 1:05")).toBeInTheDocument();
+  });
+
+  it("ignores invalid voice message props when falling back", () => {
+    render(
+      <VoicePostComponent
+        post={makePost({
+          file_ids: ["fallback-file"],
+          props: { voice_message: [] },
+        })}
+      />,
+    );
+
+    expect(getCreatedAudio()).toHaveAttribute(
+      "src",
+      "/api/v4/files/fallback-file?t=123",
+    );
   });
 
   it("renders a skinned waveform scrubber", () => {

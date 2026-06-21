@@ -7,12 +7,11 @@ import {
   waitFor,
 } from "@testing-library/react";
 import React from "react";
-import { resetClientConfigCacheForTests } from "./client_config";
-import { VoiceRecorderAction } from "./components/voice_recorder_action";
-import { waveformBarCount } from "./waveform";
+import { waveformBarCount } from "../audio/waveform";
+import { VoiceRecorderAction } from "./voice_recorder_action";
 
-vi.mock("./waveform", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./waveform")>();
+vi.mock("../audio/waveform", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../audio/waveform")>();
   return {
     ...actual,
     extractWaveformPeaksFromBlob: vi.fn(async () =>
@@ -38,6 +37,10 @@ vi.mock("browser-whisper", () => ({
     this.dispose = browserWhisperMock.dispose;
     this.transcribe = browserWhisperMock.transcribe;
   }),
+  MODELS: {
+    "whisper-tiny": {},
+    "whisper-base": {},
+  },
 }));
 
 type FakeTrack = {
@@ -184,7 +187,6 @@ describe("VoiceRecorderAction", () => {
   const originalPause = HTMLMediaElement.prototype.pause;
 
   beforeEach(() => {
-    resetClientConfigCacheForTests();
     browserWhisperMock.cancel.mockReset();
     browserWhisperMock.dispose.mockReset();
     browserWhisperMock.transcribe.mockReset();
@@ -200,7 +202,6 @@ describe("VoiceRecorderAction", () => {
 
   afterEach(() => {
     cleanup();
-    resetClientConfigCacheForTests();
     vi.useRealTimers();
     Date.now = realDateNow;
     HTMLMediaElement.prototype.pause = originalPause;
@@ -219,8 +220,6 @@ describe("VoiceRecorderAction", () => {
     render(
       <VoiceRecorderAction
         draft={{ channelId: "channel-id", rootId: "root-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
       />,
     );
 
@@ -236,7 +235,7 @@ describe("VoiceRecorderAction", () => {
     expect(formData.get("channel_id")).toBe("channel-id");
     expect(formData.get("root_id")).toBe("root-id");
     expect(formData.get("duration_ms")).toBe("2000");
-    expect(formData.get("mime_type")).toBe("audio/mp4");
+    expect(formData.has("mime_type")).toBe(false);
     expect(formData.get("audio")).toBeInstanceOf(File);
     expect(formData.get("transcript")).toBeNull();
     expect(JSON.parse(String(formData.get("waveform")))).toHaveLength(
@@ -254,13 +253,7 @@ describe("VoiceRecorderAction", () => {
     });
     vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Record voice message" }),
@@ -280,8 +273,6 @@ describe("VoiceRecorderAction", () => {
     render(
       <VoiceRecorderAction
         draft={{ channelId: "channel-id", rootId: "root-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
       />,
     );
 
@@ -312,13 +303,7 @@ describe("VoiceRecorderAction", () => {
         new Response("Invalid duration_ms", { status: 400 }),
     });
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     await recordAndReview();
     fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
@@ -336,13 +321,7 @@ describe("VoiceRecorderAction", () => {
     const track = { stop: vi.fn() };
     installRecorderEnvironment(track);
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Record voice message" }),
@@ -361,11 +340,7 @@ describe("VoiceRecorderAction", () => {
     installRecorderEnvironment(track);
 
     const { unmount } = render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
+      <VoiceRecorderAction draft={{ channelId: "channel-id" }} />,
     );
 
     fireEvent.click(
@@ -385,13 +360,7 @@ describe("VoiceRecorderAction", () => {
       config: { voice_messages_enabled: false },
     });
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(
@@ -403,13 +372,7 @@ describe("VoiceRecorderAction", () => {
     const track = { stop: vi.fn() };
     installRecorderEnvironment(track);
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     await recordAndReview();
     fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
@@ -433,13 +396,7 @@ describe("VoiceRecorderAction", () => {
       };
     });
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     await recordAndReview();
     fireEvent.click(
@@ -467,13 +424,7 @@ describe("VoiceRecorderAction", () => {
       throw new Error("transcription failed");
     });
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     await recordAndReview();
     fireEvent.click(
@@ -508,13 +459,7 @@ describe("VoiceRecorderAction", () => {
       };
     });
 
-    render(
-      <VoiceRecorderAction
-        draft={{ channelId: "channel-id" }}
-        getSelectedText={() => ({})}
-        updateText={() => undefined}
-      />,
-    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
 
     await recordAndReview();
 

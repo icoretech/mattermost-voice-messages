@@ -1,19 +1,13 @@
-import {
-  defaultClientConfig,
-  loadClientConfig,
-  resetClientConfigCacheForTests,
-} from "./client_config";
+import { defaultClientConfig, loadClientConfig } from "./client_config";
 
 describe("client config", () => {
   beforeEach(() => {
-    resetClientConfigCacheForTests();
     window.basename = "";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    resetClientConfigCacheForTests();
   });
 
   it("maps successful snake_case responses", async () => {
@@ -79,7 +73,7 @@ describe("client config", () => {
     await expect(loadClientConfig()).rejects.toThrow("blocked");
   });
 
-  it("resetClientConfigCacheForTests isolates cached responses", async () => {
+  it("fetches fresh responses for each load", async () => {
     vi.stubGlobal(
       "fetch",
       vi
@@ -91,7 +85,6 @@ describe("client config", () => {
     await expect(loadClientConfig()).resolves.toMatchObject({
       voiceMessagesEnabled: false,
     });
-    resetClientConfigCacheForTests();
     await expect(loadClientConfig()).resolves.toMatchObject({
       voiceMessagesEnabled: true,
     });

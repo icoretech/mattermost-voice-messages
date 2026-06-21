@@ -1,7 +1,7 @@
 import type { FileInfo } from "@mattermost/types/files";
 import type { Post } from "@mattermost/types/posts";
 import { describe, expect, it } from "vitest";
-import { shouldOverrideVoiceFilePreview } from "../voice_file_preview";
+import { shouldOverrideVoiceFilePreview } from "../plugin/voice_file_preview";
 
 function makePost(props: Post["props"]): Post {
   return {
@@ -41,5 +41,11 @@ describe("voice file preview override", () => {
     expect(shouldOverrideVoiceFilePreview([] as FileInfo[], makePost({}))).toBe(
       false,
     );
+    expect(
+      shouldOverrideVoiceFilePreview(
+        [] as FileInfo[],
+        makePost({ voice_message: [] }),
+      ),
+    ).toBe(false);
   });
 });

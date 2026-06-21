@@ -1,6 +1,7 @@
 import type { Post } from "@mattermost/types/posts";
 import React, { useLayoutEffect, useRef } from "react";
-import { voicePostType } from "../constants";
+import { legacyVoicePostType } from "../constants";
+import { hasVoiceMessageProps } from "../voice_message_props";
 import { VoicePostComponent } from "./voice_post";
 
 export type VoicePostAttachmentProps = {
@@ -9,19 +10,6 @@ export type VoicePostAttachmentProps = {
   onHeightChange?: (height: number) => void;
 };
 
-function getVoiceMessageProps(post: Post): Record<string, unknown> | undefined {
-  const voiceMessage = post.props?.voice_message;
-  if (
-    !voiceMessage ||
-    typeof voiceMessage !== "object" ||
-    Array.isArray(voiceMessage)
-  ) {
-    return undefined;
-  }
-
-  return voiceMessage as Record<string, unknown>;
-}
-
 export function createVoicePostAttachmentComponent(
   getPostById: (postId: string) => Post | undefined,
 ): React.FC<VoicePostAttachmentProps> {
@@ -29,33 +17,24 @@ export function createVoicePostAttachmentComponent(
     const post =
       props.post ?? (props.postId ? getPostById(props.postId) : undefined);
     const rootRef = useRef<HTMLDivElement | null>(null);
-    const voiceMessage = post ? getVoiceMessageProps(post) : undefined;
-    const postId = post?.id;
-    const postUpdateAt = post?.update_at;
+    const hasVoiceMessage = hasVoiceMessageProps(post);
     const shouldRender = Boolean(
       post &&
         post.delete_at === 0 &&
-        voiceMessage &&
-        (post.type as string) !== voicePostType,
+        hasVoiceMessage &&
+        (post.type as string) !== legacyVoicePostType,
     );
+    const heightMeasurementKey = shouldRender
+      ? `${post?.id ?? ""}:${post?.update_at ?? ""}:${String(hasVoiceMessage)}`
+      : "";
 
     useLayoutEffect(() => {
-      if (!shouldRender) {
+      if (!heightMeasurementKey) {
         return;
       }
 
-      void postId;
-      void postUpdateAt;
-      void voiceMessage;
-
       props.onHeightChange?.(rootRef.current?.offsetHeight ?? 0);
-    }, [
-      shouldRender,
-      postId,
-      postUpdateAt,
-      voiceMessage,
-      props.onHeightChange,
-    ]);
+    }, [heightMeasurementKey, props.onHeightChange]);
 
     if (!post || !shouldRender) {
       return null;

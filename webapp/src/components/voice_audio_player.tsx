@@ -4,7 +4,7 @@ import {
   getRenderableWaveformPeaks,
   peakToBarHeightPercent,
   type WaveformPeaks,
-} from "../waveform";
+} from "../audio/waveform";
 
 const playbackSpeeds = [0.5, 1, 1.5, 2] as const;
 const waveformBars = Array.from({ length: 24 }, (_, index) => index);

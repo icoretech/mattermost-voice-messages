@@ -1,29 +1,11 @@
 import { useEffect, useState } from "react";
+import {
+  type ClientTranscriptionModel,
+  type ClientTranscriptionQuantization,
+  clientTranscriptionModelSet,
+  clientTranscriptionQuantizationSet,
+} from "../plugin/manifest";
 import { getSiteBasePath } from "./site_base_path";
-
-export type ClientTranscriptionModel =
-  | "whisper-tiny"
-  | "whisper-base"
-  | "whisper-small"
-  | "whisper-tiny_timestamped"
-  | "whisper-base_timestamped"
-  | "whisper-small_timestamped"
-  | "whisper-large-v3-turbo"
-  | "whisper-large-v3-turbo_timestamped"
-  | "whisper-large-v3"
-  | "lite-whisper-large-v3-turbo-fast"
-  | "lite-whisper-large-v3-turbo"
-  | "lite-whisper-large-v3-turbo-acc"
-  | "moonshine-tiny"
-  | "moonshine-base"
-  | "distil-whisper-small";
-
-export type ClientTranscriptionQuantization =
-  | "hybrid"
-  | "q4"
-  | "q8"
-  | "fp16"
-  | "fp32";
 
 export type VoiceMessagesClientConfig = {
   voiceMessagesEnabled: boolean;
@@ -45,33 +27,6 @@ type ServerVoiceMessagesClientConfig = {
   client_transcription_language?: unknown;
 };
 
-const clientTranscriptionModels = new Set<ClientTranscriptionModel>([
-  "whisper-tiny",
-  "whisper-base",
-  "whisper-small",
-  "whisper-tiny_timestamped",
-  "whisper-base_timestamped",
-  "whisper-small_timestamped",
-  "whisper-large-v3-turbo",
-  "whisper-large-v3-turbo_timestamped",
-  "whisper-large-v3",
-  "lite-whisper-large-v3-turbo-fast",
-  "lite-whisper-large-v3-turbo",
-  "lite-whisper-large-v3-turbo-acc",
-  "moonshine-tiny",
-  "moonshine-base",
-  "distil-whisper-small",
-]);
-
-const clientTranscriptionQuantizations =
-  new Set<ClientTranscriptionQuantization>([
-    "hybrid",
-    "q4",
-    "q8",
-    "fp16",
-    "fp32",
-  ]);
-
 export const defaultClientConfig: VoiceMessagesClientConfig = {
   voiceMessagesEnabled: true,
   uploadedAudioPreviewEnabled: true,
@@ -82,8 +37,6 @@ export const defaultClientConfig: VoiceMessagesClientConfig = {
   clientTranscriptionLanguage: "",
 };
 
-let clientConfigPromise: Promise<VoiceMessagesClientConfig> | null = null;
-
 function booleanOrDefault(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
@@ -91,7 +44,7 @@ function booleanOrDefault(value: unknown, fallback: boolean): boolean {
 function modelOrDefault(value: unknown): ClientTranscriptionModel {
   if (
     typeof value === "string" &&
-    clientTranscriptionModels.has(value as ClientTranscriptionModel)
+    clientTranscriptionModelSet.has(value as ClientTranscriptionModel)
   ) {
     return value as ClientTranscriptionModel;
   }
@@ -103,7 +56,7 @@ function quantizationOrDefault(
 ): ClientTranscriptionQuantization {
   if (
     typeof value === "string" &&
-    clientTranscriptionQuantizations.has(
+    clientTranscriptionQuantizationSet.has(
       value as ClientTranscriptionQuantization,
     )
   ) {
@@ -150,18 +103,10 @@ function mapClientConfig(
   };
 }
 
-export function resetClientConfigCacheForTests(): void {
-  clientConfigPromise = null;
-}
-
 export function loadClientConfig(
   signal?: AbortSignal,
 ): Promise<VoiceMessagesClientConfig> {
-  if (clientConfigPromise) {
-    return clientConfigPromise;
-  }
-
-  const promise = fetch(
+  return fetch(
     `${getSiteBasePath()}/plugins/ch.icorete.mattermost-voice-messages/api/v1/config`,
     {
       credentials: "same-origin",
@@ -178,15 +123,6 @@ export function loadClientConfig(
       (await response.json()) as ServerVoiceMessagesClientConfig,
     );
   });
-
-  clientConfigPromise = promise;
-  promise.catch(() => {
-    if (clientConfigPromise === promise) {
-      clientConfigPromise = null;
-    }
-  });
-
-  return promise;
 }
 
 export function useVoiceMessagesClientConfig(): {

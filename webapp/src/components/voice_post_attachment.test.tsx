@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import type { Post } from "@mattermost/types/posts";
 import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
-import { voicePostType } from "../constants";
+import { legacyVoicePostType } from "../constants";
 import { createVoicePostAttachmentComponent } from "./voice_post_attachment";
 
 function makePost(overrides: Partial<Post> = {}): Post {
@@ -117,6 +117,17 @@ describe("VoicePostAttachment", () => {
     expect(createdAudios).toHaveLength(0);
   });
 
+  it("returns no player for invalid voice message props", () => {
+    const Attachment = createVoicePostAttachmentComponent(() => undefined);
+
+    const { container } = render(
+      <Attachment post={makePost({ props: { voice_message: [] } })} />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(createdAudios).toHaveLength(0);
+  });
+
   it("returns no player for deleted voice posts", () => {
     const Attachment = createVoicePostAttachmentComponent(() => undefined);
 
@@ -151,13 +162,13 @@ describe("VoicePostAttachment", () => {
     expect(onHeightChange).toHaveBeenCalled();
   });
 
-  it("does not duplicate historical custom voice posts", () => {
+  it("does not duplicate historical legacy custom voice posts", () => {
     const Attachment = createVoicePostAttachmentComponent(() => undefined);
 
     const { container } = render(
       <Attachment
         post={makePost({
-          type: voicePostType as Post["type"],
+          type: legacyVoicePostType as Post["type"],
           file_ids: ["file-id"],
           props: { voice_message: { duration_ms: 1_000 } },
         })}

@@ -36,7 +36,6 @@ export async function uploadVoiceMessage(
     formData.append("root_id", input.rootId);
   }
   formData.append("duration_ms", String(Math.round(input.durationMs)));
-  formData.append("mime_type", input.mimeType);
   if (input.waveform) {
     formData.append("waveform", JSON.stringify(input.waveform));
   }

@@ -2,6 +2,7 @@ bin/
 dist/
 coverage/
 webapp/src/manifest.ts
+webapp/src/plugin/manifest.ts
 server/manifest.go
 
 # Dependencies
