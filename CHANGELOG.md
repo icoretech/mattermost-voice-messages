@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.3](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.2...v0.1.3) (2026-06-21)
+
+
+### Features
+
+* add configurable local voice transcription ([b373756](https://github.com/icoretech/mattermost-voice-messages/commit/b3737563eac9bb7e7f7e4d5ef3c4eea9b5f05abd))
+
+
+### Bug Fixes
+
+* generate manifests before server CI checks ([5cdf293](https://github.com/icoretech/mattermost-voice-messages/commit/5cdf293287c0992ba17550da17c1b7d06d7b4f52))
+* preserve multipart parse errors ([531f18b](https://github.com/icoretech/mattermost-voice-messages/commit/531f18b8e8e1188cee2944107939be1f5cc87e9c))
+
 ## [0.1.2](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.1...v0.1.2) (2026-06-20)
 
 

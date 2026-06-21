@@ -2,7 +2,7 @@
     "id": "ch.icorete.mattermost-voice-messages",
     "name": "Mattermost Voice Messages",
     "description": "Record and play voice messages in Mattermost channels and threads.",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "homepage_url": "https://github.com/icoretech/mattermost-voice-messages",
     "support_url": "https://github.com/icoretech/mattermost-voice-messages/issues",
     "release_notes_url": "https://github.com/icoretech/mattermost-voice-messages/releases",
@@ -58,21 +58,66 @@
                 "help_text": "browser-whisper model to run in the browser. Default is whisper-tiny to keep the first download light. Larger models can require hundreds of MB or GB of local model downloads.",
                 "default": "whisper-tiny",
                 "options": [
-                    {"display_name": "whisper-tiny", "value": "whisper-tiny"},
-                    {"display_name": "whisper-base", "value": "whisper-base"},
-                    {"display_name": "whisper-small", "value": "whisper-small"},
-                    {"display_name": "whisper-tiny timestamped", "value": "whisper-tiny_timestamped"},
-                    {"display_name": "whisper-base timestamped", "value": "whisper-base_timestamped"},
-                    {"display_name": "whisper-small timestamped", "value": "whisper-small_timestamped"},
-                    {"display_name": "whisper-large-v3-turbo", "value": "whisper-large-v3-turbo"},
-                    {"display_name": "whisper-large-v3-turbo timestamped", "value": "whisper-large-v3-turbo_timestamped"},
-                    {"display_name": "whisper-large-v3", "value": "whisper-large-v3"},
-                    {"display_name": "lite-whisper-large-v3-turbo-fast", "value": "lite-whisper-large-v3-turbo-fast"},
-                    {"display_name": "lite-whisper-large-v3-turbo", "value": "lite-whisper-large-v3-turbo"},
-                    {"display_name": "lite-whisper-large-v3-turbo-acc", "value": "lite-whisper-large-v3-turbo-acc"},
-                    {"display_name": "moonshine-tiny", "value": "moonshine-tiny"},
-                    {"display_name": "moonshine-base", "value": "moonshine-base"},
-                    {"display_name": "distil-whisper-small", "value": "distil-whisper-small"}
+                    {
+                        "display_name": "whisper-tiny",
+                        "value": "whisper-tiny"
+                    },
+                    {
+                        "display_name": "whisper-base",
+                        "value": "whisper-base"
+                    },
+                    {
+                        "display_name": "whisper-small",
+                        "value": "whisper-small"
+                    },
+                    {
+                        "display_name": "whisper-tiny timestamped",
+                        "value": "whisper-tiny_timestamped"
+                    },
+                    {
+                        "display_name": "whisper-base timestamped",
+                        "value": "whisper-base_timestamped"
+                    },
+                    {
+                        "display_name": "whisper-small timestamped",
+                        "value": "whisper-small_timestamped"
+                    },
+                    {
+                        "display_name": "whisper-large-v3-turbo",
+                        "value": "whisper-large-v3-turbo"
+                    },
+                    {
+                        "display_name": "whisper-large-v3-turbo timestamped",
+                        "value": "whisper-large-v3-turbo_timestamped"
+                    },
+                    {
+                        "display_name": "whisper-large-v3",
+                        "value": "whisper-large-v3"
+                    },
+                    {
+                        "display_name": "lite-whisper-large-v3-turbo-fast",
+                        "value": "lite-whisper-large-v3-turbo-fast"
+                    },
+                    {
+                        "display_name": "lite-whisper-large-v3-turbo",
+                        "value": "lite-whisper-large-v3-turbo"
+                    },
+                    {
+                        "display_name": "lite-whisper-large-v3-turbo-acc",
+                        "value": "lite-whisper-large-v3-turbo-acc"
+                    },
+                    {
+                        "display_name": "moonshine-tiny",
+                        "value": "moonshine-tiny"
+                    },
+                    {
+                        "display_name": "moonshine-base",
+                        "value": "moonshine-base"
+                    },
+                    {
+                        "display_name": "distil-whisper-small",
+                        "value": "distil-whisper-small"
+                    }
                 ]
             },
             {
@@ -82,11 +127,26 @@
                 "help_text": "Model precision passed to browser-whisper. Use hybrid unless a browser/device requires a specific mode.",
                 "default": "hybrid",
                 "options": [
-                    {"display_name": "hybrid", "value": "hybrid"},
-                    {"display_name": "q4", "value": "q4"},
-                    {"display_name": "q8", "value": "q8"},
-                    {"display_name": "fp16", "value": "fp16"},
-                    {"display_name": "fp32", "value": "fp32"}
+                    {
+                        "display_name": "hybrid",
+                        "value": "hybrid"
+                    },
+                    {
+                        "display_name": "q4",
+                        "value": "q4"
+                    },
+                    {
+                        "display_name": "q8",
+                        "value": "q8"
+                    },
+                    {
+                        "display_name": "fp16",
+                        "value": "fp16"
+                    },
+                    {
+                        "display_name": "fp32",
+                        "value": "fp32"
+                    }
                 ]
             },
             {
