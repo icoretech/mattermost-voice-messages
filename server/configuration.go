@@ -5,37 +5,96 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+
+	"github.com/mattermost/mattermost/server/public/model"
 )
 
 const (
-	defaultClientTranscriptionModel        = "whisper-tiny"
-	defaultClientTranscriptionQuantization = "hybrid"
+	clientTranscriptionModelSettingKey        = "ClientTranscriptionModel"
+	clientTranscriptionQuantizationSettingKey = "ClientTranscriptionQuantization"
+	fallbackClientTranscriptionModel          = "whisper-tiny"
+	fallbackClientTranscriptionQuantization   = "hybrid"
 )
 
-var allowedClientTranscriptionModels = map[string]struct{}{
-	"whisper-tiny":                       {},
-	"whisper-base":                       {},
-	"whisper-small":                      {},
-	"whisper-tiny_timestamped":           {},
-	"whisper-base_timestamped":           {},
-	"whisper-small_timestamped":          {},
-	"whisper-large-v3-turbo":             {},
-	"whisper-large-v3-turbo_timestamped": {},
-	"whisper-large-v3":                   {},
-	"lite-whisper-large-v3-turbo-fast":   {},
-	"lite-whisper-large-v3-turbo":        {},
-	"lite-whisper-large-v3-turbo-acc":    {},
-	"moonshine-tiny":                     {},
-	"moonshine-base":                     {},
-	"distil-whisper-small":               {},
+var (
+	clientTranscriptionModelOptionsOnce        sync.Once
+	clientTranscriptionModelOptions            map[string]struct{}
+	clientTranscriptionQuantizationOptionsOnce sync.Once
+	clientTranscriptionQuantizationOptions     map[string]struct{}
+)
+
+func findPluginSetting(key string) *model.PluginSetting {
+	if manifest == nil || manifest.SettingsSchema == nil {
+		return nil
+	}
+
+	for _, setting := range manifest.SettingsSchema.Settings {
+		if setting != nil && setting.Key == key {
+			return setting
+		}
+	}
+	return nil
 }
 
-var allowedClientTranscriptionQuantizations = map[string]struct{}{
-	"hybrid": {},
-	"q4":     {},
-	"q8":     {},
-	"fp16":   {},
-	"fp32":   {},
+func pluginSettingDefaultString(key string, fallback string) string {
+	setting := findPluginSetting(key)
+	if setting == nil {
+		return fallback
+	}
+
+	value, ok := setting.Default.(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
+}
+
+func pluginSettingOptionSet(key string) map[string]struct{} {
+	setting := findPluginSetting(key)
+	if setting == nil {
+		return nil
+	}
+
+	options := make(map[string]struct{}, len(setting.Options))
+	for _, option := range setting.Options {
+		if option != nil && option.Value != "" {
+			options[option.Value] = struct{}{}
+		}
+	}
+	return options
+}
+
+func allowedClientTranscriptionModelValues() map[string]struct{} {
+	clientTranscriptionModelOptionsOnce.Do(func() {
+		clientTranscriptionModelOptions = pluginSettingOptionSet(clientTranscriptionModelSettingKey)
+	})
+	return clientTranscriptionModelOptions
+}
+
+func allowedClientTranscriptionQuantizationValues() map[string]struct{} {
+	clientTranscriptionQuantizationOptionsOnce.Do(func() {
+		clientTranscriptionQuantizationOptions = pluginSettingOptionSet(clientTranscriptionQuantizationSettingKey)
+	})
+	return clientTranscriptionQuantizationOptions
+}
+
+func isAllowedClientTranscriptionModel(value string) bool {
+	_, ok := allowedClientTranscriptionModelValues()[value]
+	return ok
+}
+
+func isAllowedClientTranscriptionQuantization(value string) bool {
+	_, ok := allowedClientTranscriptionQuantizationValues()[value]
+	return ok
+}
+
+func defaultClientTranscriptionModel() string {
+	return pluginSettingDefaultString(clientTranscriptionModelSettingKey, fallbackClientTranscriptionModel)
+}
+
+func defaultClientTranscriptionQuantization() string {
+	return pluginSettingDefaultString(clientTranscriptionQuantizationSettingKey, fallbackClientTranscriptionQuantization)
 }
 
 type configuration struct {
@@ -107,18 +166,18 @@ func (c *configuration) clientTranscriptionAutoStart() bool {
 
 func (c *configuration) clientTranscriptionModel() string {
 	model := strings.TrimSpace(c.ClientTranscriptionModel)
-	if _, ok := allowedClientTranscriptionModels[model]; ok {
+	if isAllowedClientTranscriptionModel(model) {
 		return model
 	}
-	return defaultClientTranscriptionModel
+	return defaultClientTranscriptionModel()
 }
 
 func (c *configuration) clientTranscriptionQuantization() string {
 	quantization := strings.TrimSpace(c.ClientTranscriptionQuantization)
-	if _, ok := allowedClientTranscriptionQuantizations[quantization]; ok {
+	if isAllowedClientTranscriptionQuantization(quantization) {
 		return quantization
 	}
-	return defaultClientTranscriptionQuantization
+	return defaultClientTranscriptionQuantization()
 }
 
 func (c *configuration) clientTranscriptionLanguage() string {
@@ -139,17 +198,13 @@ func (c *configuration) clientConfiguration() clientConfiguration {
 
 func (c *configuration) Validate() error {
 	model := strings.TrimSpace(c.ClientTranscriptionModel)
-	if model != "" {
-		if _, ok := allowedClientTranscriptionModels[model]; !ok {
-			return fmt.Errorf("invalid ClientTranscriptionModel")
-		}
+	if model != "" && !isAllowedClientTranscriptionModel(model) {
+		return fmt.Errorf("invalid ClientTranscriptionModel")
 	}
 
 	quantization := strings.TrimSpace(c.ClientTranscriptionQuantization)
-	if quantization != "" {
-		if _, ok := allowedClientTranscriptionQuantizations[quantization]; !ok {
-			return fmt.Errorf("invalid ClientTranscriptionQuantization")
-		}
+	if quantization != "" && !isAllowedClientTranscriptionQuantization(quantization) {
+		return fmt.Errorf("invalid ClientTranscriptionQuantization")
 	}
 
 	language := strings.TrimSpace(c.ClientTranscriptionLanguage)

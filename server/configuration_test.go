@@ -19,8 +19,8 @@ func defaultClientConfiguration() clientConfiguration {
 		UploadedAudioPreviewEnabled:     true,
 		ClientTranscriptionEnabled:      false,
 		ClientTranscriptionAutoStart:    false,
-		ClientTranscriptionModel:        defaultClientTranscriptionModel,
-		ClientTranscriptionQuantization: defaultClientTranscriptionQuantization,
+		ClientTranscriptionModel:        defaultClientTranscriptionModel(),
+		ClientTranscriptionQuantization: defaultClientTranscriptionQuantization(),
 		ClientTranscriptionLanguage:     "",
 	}
 }
@@ -76,6 +76,35 @@ func TestConfigurationValidateRejectsInvalidValues(t *testing.T) {
 			assert.EqualError(t, err, tc.wantError)
 		})
 	}
+}
+
+func TestConfigurationUsesManifestTranscriptionOptions(t *testing.T) {
+	configuration := configuration{
+		ClientTranscriptionModel:        "moonshine-base",
+		ClientTranscriptionQuantization: "fp16",
+	}
+
+	require.NoError(t, configuration.Validate())
+	assert.Equal(t, "moonshine-base", configuration.clientTranscriptionModel())
+	assert.Equal(t, "fp16", configuration.clientTranscriptionQuantization())
+}
+
+func TestConfigurationTranscriptionOptionsMatchManifestSettings(t *testing.T) {
+	modelSetting := findPluginSetting(clientTranscriptionModelSettingKey)
+	require.NotNil(t, modelSetting)
+	for _, option := range modelSetting.Options {
+		require.NotNil(t, option)
+		assert.True(t, isAllowedClientTranscriptionModel(option.Value), option.Value)
+	}
+	assert.Equal(t, modelSetting.Default, defaultClientTranscriptionModel())
+
+	quantizationSetting := findPluginSetting(clientTranscriptionQuantizationSettingKey)
+	require.NotNil(t, quantizationSetting)
+	for _, option := range quantizationSetting.Options {
+		require.NotNil(t, option)
+		assert.True(t, isAllowedClientTranscriptionQuantization(option.Value), option.Value)
+	}
+	assert.Equal(t, quantizationSetting.Default, defaultClientTranscriptionQuantization())
 }
 
 func TestOnConfigurationChangeLoadsConfiguration(t *testing.T) {
