@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.3...v0.1.4) (2026-06-21)
+
+
+### Bug Fixes
+
+* harden voice audio upload validation ([e12bf4b](https://github.com/icoretech/mattermost-voice-messages/commit/e12bf4b6408d63b7cb14bcb3d726769e5253ce90))
+
 ## [0.1.3](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.2...v0.1.3) (2026-06-21)
 
 
