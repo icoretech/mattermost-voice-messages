@@ -48,14 +48,13 @@ const manifest = JSON.parse(
 );
 
 export const clientTranscriptionModels = %s as const satisfies readonly ASRModel[];
-export type ClientTranscriptionModel = (typeof clientTranscriptionModels)[number];
+export type ClientTranscriptionModel =
+  (typeof clientTranscriptionModels)[number];
 export const clientTranscriptionModelSet = new Set<ClientTranscriptionModel>(
   clientTranscriptionModels,
 );
 
-export const clientTranscriptionQuantizations = %s as const satisfies readonly NonNullable<
-  TranscribeOptions["quantization"]
->[];
+export const clientTranscriptionQuantizations = %s as const satisfies readonly NonNullable<TranscribeOptions["quantization"]>[];
 export type ClientTranscriptionQuantization =
   (typeof clientTranscriptionQuantizations)[number];
 export const clientTranscriptionQuantizationSet =
@@ -222,7 +221,7 @@ func applyManifest(manifest *model.Manifest) error {
 		if err != nil {
 			return err
 		}
-		modelOptionsBytes, err := json.Marshal(modelOptions)
+		modelOptionsLiteral, err := jsStringArrayLiteral(modelOptions)
 		if err != nil {
 			return err
 		}
@@ -231,7 +230,7 @@ func applyManifest(manifest *model.Manifest) error {
 		if err != nil {
 			return err
 		}
-		quantizationOptionsBytes, err := json.Marshal(quantizationOptions)
+		quantizationOptionsLiteral, err := jsStringArrayLiteral(quantizationOptions)
 		if err != nil {
 			return err
 		}
@@ -239,7 +238,7 @@ func applyManifest(manifest *model.Manifest) error {
 		// write generated code to file by using JS file template.
 		if err := os.WriteFile(
 			"webapp/src/plugin/manifest.ts",
-			fmt.Appendf(nil, pluginIDJSFileTemplate, manifest.Version, manifestStr, string(modelOptionsBytes), string(quantizationOptionsBytes)),
+			fmt.Appendf(nil, pluginIDJSFileTemplate, manifest.Version, manifestStr, modelOptionsLiteral, quantizationOptionsLiteral),
 			0o600,
 		); err != nil {
 			return errors.Wrap(err, "failed to open webapp/src/plugin/manifest.ts")
@@ -273,6 +272,22 @@ func clientTranscriptionSettingOptions(manifest *model.Manifest, key string) ([]
 	}
 
 	return nil, errors.Errorf("%s setting not found", key)
+}
+
+func jsStringArrayLiteral(values []string) (string, error) {
+	var builder strings.Builder
+	builder.WriteString("[\n")
+	for _, value := range values {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		builder.WriteString("  ")
+		builder.Write(encoded)
+		builder.WriteString(",\n")
+	}
+	builder.WriteString("]")
+	return builder.String(), nil
 }
 
 // distManifest writes the manifest file to the dist directory
