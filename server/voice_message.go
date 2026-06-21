@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,11 +31,6 @@ type voiceMessageFormFields struct {
 	durationMS int64
 	waveform   []any
 	transcript string
-}
-
-type voiceAudioPart struct {
-	data     []byte
-	mimeType string
 }
 
 type voiceMessageResponse struct {
@@ -182,37 +175,6 @@ func parseVoiceMessageFormFields(r *http.Request, allowTranscript bool) (voiceMe
 	return voiceMessageFormFields{channelID: channelID, rootID: rootID, durationMS: durationMS, waveform: waveform, transcript: transcript}, nil
 }
 
-func parseVoiceAudioPart(r *http.Request, maxBytes int64) (parsed voiceAudioPart, handlerErr *handlerError) {
-	file, header, err := r.FormFile("audio")
-	if err != nil {
-		return voiceAudioPart{}, &handlerError{message: "Missing audio file", status: http.StatusBadRequest}
-	}
-	defer func() {
-		if err := file.Close(); err != nil && handlerErr == nil {
-			handlerErr = &handlerError{message: "Could not read audio file", status: http.StatusBadRequest}
-		}
-	}()
-
-	data, handlerErr := readVoiceAudioData(file, maxBytes)
-	if handlerErr != nil {
-		return voiceAudioPart{}, handlerErr
-	}
-
-	contentType := ""
-	if header != nil {
-		contentType = header.Header.Get("Content-Type")
-	}
-	if contentType == "" {
-		contentType = http.DetectContentType(data)
-	}
-	mimeType, _, ok := detectVoiceAudio(contentType)
-	if !ok {
-		return voiceAudioPart{}, &handlerError{message: "Unsupported audio type", status: http.StatusUnsupportedMediaType}
-	}
-
-	return voiceAudioPart{data: data, mimeType: mimeType}, nil
-}
-
 func normalizeVoiceTranscript(value string) string {
 	normalized := strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(value, "\r\n", "\n"), "\r", "\n"))
 	if normalized == "" {
@@ -257,38 +219,6 @@ func parseVoiceWaveform(value string) ([]any, *handlerError) {
 	}
 
 	return waveform, nil
-}
-
-func readVoiceAudioData(file multipart.File, maxBytes int64) ([]byte, *handlerError) {
-	data, err := io.ReadAll(io.LimitReader(file, maxBytes+1))
-	if err != nil {
-		return nil, &handlerError{message: "Could not read audio file", status: http.StatusBadRequest}
-	}
-	if len(data) == 0 {
-		return nil, &handlerError{message: "Empty audio file", status: http.StatusBadRequest}
-	}
-	if int64(len(data)) > maxBytes {
-		return nil, &handlerError{message: "Voice message too large", status: http.StatusRequestEntityTooLarge}
-	}
-	return data, nil
-}
-
-func detectVoiceAudio(contentType string) (mimeType string, extension string, ok bool) {
-	mimeType = strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
-	switch mimeType {
-	case "audio/webm":
-		return mimeType, ".webm", true
-	case "audio/ogg":
-		return mimeType, ".ogg", true
-	case "audio/mp4":
-		return mimeType, ".m4a", true
-	case "audio/mpeg":
-		return mimeType, ".mp3", true
-	case "audio/wav", "audio/x-wav":
-		return mimeType, ".wav", true
-	default:
-		return "", "", false
-	}
 }
 
 func buildVoiceMessageProps(fileInfo *model.FileInfo, mimeType string, durationMS int64, size int64, waveform []any) map[string]any {

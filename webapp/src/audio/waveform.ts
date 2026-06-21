@@ -73,28 +73,6 @@ export async function extractWaveformPeaksFromBlob(
   );
 }
 
-export async function extractWaveformPeaksFromUrl(
-  src: string,
-  signal: AbortSignal,
-  barCount = waveformBarCount,
-): Promise<WaveformPeaks | undefined> {
-  try {
-    const response = await fetch(src, {
-      credentials: "same-origin",
-      signal,
-    });
-    if (!response.ok) {
-      return undefined;
-    }
-    return extractWaveformPeaksFromArrayBuffer(
-      await response.arrayBuffer(),
-      barCount,
-    );
-  } catch {
-    return undefined;
-  }
-}
-
 async function extractWaveformPeaksFromArrayBuffer(
   arrayBuffer: ArrayBuffer,
   barCount: number,

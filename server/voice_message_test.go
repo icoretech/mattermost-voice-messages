@@ -152,7 +152,7 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 		},
 		{
 			name:       "missing channel id",
-			file:       []byte("abc"),
+			file:       validWebMAudioBytes(),
 			fileName:   "voice.webm",
 			maxBytes:   maxVoiceMessageBytes,
 			wantStatus: http.StatusBadRequest,
@@ -161,7 +161,7 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 		{
 			name:       "invalid channel id",
 			fields:     map[string]string{"channel_id": "not-valid"},
-			file:       []byte("abc"),
+			file:       validWebMAudioBytes(),
 			fileName:   "voice.webm",
 			maxBytes:   maxVoiceMessageBytes,
 			wantStatus: http.StatusBadRequest,
@@ -170,7 +170,7 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 		{
 			name:       "invalid root id",
 			fields:     map[string]string{"channel_id": validChannelID, "root_id": "not-valid"},
-			file:       []byte("abc"),
+			file:       validWebMAudioBytes(),
 			fileName:   "voice.webm",
 			maxBytes:   maxVoiceMessageBytes,
 			wantStatus: http.StatusBadRequest,
@@ -179,7 +179,7 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 		{
 			name:       "negative duration",
 			fields:     map[string]string{"channel_id": validChannelID, "root_id": validRootID, "duration_ms": "-1"},
-			file:       []byte("abc"),
+			file:       validWebMAudioBytes(),
 			fileName:   "voice.webm",
 			maxBytes:   maxVoiceMessageBytes,
 			wantStatus: http.StatusBadRequest,
@@ -197,9 +197,9 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 		{
 			name:       "over cap file",
 			fields:     map[string]string{"channel_id": validChannelID},
-			file:       []byte("abcde"),
+			file:       validWebMAudioBytes(),
 			fileName:   "voice.webm",
-			maxBytes:   4,
+			maxBytes:   3,
 			wantStatus: http.StatusRequestEntityTooLarge,
 			wantBody:   "Voice message too large",
 		},
@@ -241,7 +241,7 @@ func TestParseVoiceMessageRequestAcceptsClientUploadContract(t *testing.T) {
 		contract.AudioField,
 		contract.FileName,
 		contract.FileMimeType,
-		[]byte("abc"),
+		validWebMAudioBytes(),
 	)
 
 	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, true)
@@ -252,7 +252,7 @@ func TestParseVoiceMessageRequestAcceptsClientUploadContract(t *testing.T) {
 	assert.Equal(t, int64(1234), parsed.durationMS)
 	assert.Equal(t, contract.FileMimeType, parsed.mimeType)
 	assert.Equal(t, contract.TextFields["transcript"], parsed.transcript)
-	assert.Equal(t, []byte("abc"), parsed.data)
+	assert.Equal(t, validWebMAudioBytes(), parsed.data)
 	assert.Len(t, parsed.waveform, voiceWaveformBarCount)
 }
 
@@ -270,7 +270,7 @@ func TestParseVoiceMessageRequestReturnsValidatedAudio(t *testing.T) {
 		"root_id":     rootID,
 		"duration_ms": "1234",
 		"waveform":    string(waveformJSON),
-	}, "ignored-name.webm", "audio/webm;codecs=opus", []byte("abc"))
+	}, "ignored-name.webm", "audio/webm;codecs=opus", validWebMAudioBytes())
 
 	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, false)
 
@@ -279,7 +279,7 @@ func TestParseVoiceMessageRequestReturnsValidatedAudio(t *testing.T) {
 	assert.Equal(t, rootID, parsed.rootID)
 	assert.Equal(t, int64(1234), parsed.durationMS)
 	assert.Equal(t, "audio/webm", parsed.mimeType)
-	assert.Equal(t, []byte("abc"), parsed.data)
+	assert.Equal(t, validWebMAudioBytes(), parsed.data)
 	assert.Equal(t, peaks[1], parsed.waveform[1])
 }
 
@@ -287,7 +287,7 @@ func TestParseVoiceMessageRequestIgnoresTranscriptWhenDisabled(t *testing.T) {
 	req := newVoiceMultipartRequest(t, map[string]string{
 		"channel_id": model.NewId(),
 		"transcript": "hello",
-	}, "voice.webm", "audio/webm", []byte("abc"))
+	}, "voice.webm", "audio/webm", validWebMAudioBytes())
 
 	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, false)
 
@@ -299,7 +299,7 @@ func TestParseVoiceMessageRequestNormalizesTranscriptWhenEnabled(t *testing.T) {
 	req := newVoiceMultipartRequest(t, map[string]string{
 		"channel_id": model.NewId(),
 		"transcript": "  hello\r\nworld\r  ",
-	}, "voice.webm", "audio/webm", []byte("abc"))
+	}, "voice.webm", "audio/webm", validWebMAudioBytes())
 
 	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, true)
 
@@ -311,7 +311,7 @@ func TestParseVoiceMessageRequestTruncatesOverlongTranscript(t *testing.T) {
 	req := newVoiceMultipartRequest(t, map[string]string{
 		"channel_id": model.NewId(),
 		"transcript": strings.Repeat("a", model.PostMessageMaxRunesV2+5),
-	}, "voice.webm", "audio/webm", []byte("abc"))
+	}, "voice.webm", "audio/webm", validWebMAudioBytes())
 
 	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, true)
 
@@ -348,7 +348,7 @@ func TestHandleGetConfigReturnsEffectiveDefaults(t *testing.T) {
 
 func TestHandleCreateVoiceMessageRejectsMissingUser(t *testing.T) {
 	p := &Plugin{router: (&Plugin{}).initRouter()}
-	req := newVoiceMultipartRequest(t, map[string]string{"channel_id": model.NewId()}, "voice.webm", "audio/webm", []byte("abc"))
+	req := newVoiceMultipartRequest(t, map[string]string{"channel_id": model.NewId()}, "voice.webm", "audio/webm", validWebMAudioBytes())
 	rec := httptest.NewRecorder()
 
 	p.ServeHTTP(nil, rec, req)
@@ -363,7 +363,7 @@ func TestHandleCreateVoiceMessageRejectsDisabledVoiceMessages(t *testing.T) {
 	p.SetAPI(api)
 	p.setConfiguration(&configuration{EnableVoiceMessages: boolPtr(false)})
 	p.router = p.initRouter()
-	req := newVoiceMultipartRequest(t, map[string]string{"channel_id": model.NewId()}, "voice.webm", "audio/webm", []byte("abc"))
+	req := newVoiceMultipartRequest(t, map[string]string{"channel_id": model.NewId()}, "voice.webm", "audio/webm", validWebMAudioBytes())
 	req.Header.Set("Mattermost-User-ID", model.NewId())
 	rec := httptest.NewRecorder()
 
@@ -381,7 +381,8 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	userID := model.NewId()
 	channelID := model.NewId()
 	rootID := model.NewId()
-	fileInfo := &model.FileInfo{Id: model.NewId(), Name: "voice-message-1710000000000.webm", Size: 3, MimeType: "audio/webm"}
+	audio := validWebMAudioBytes()
+	fileInfo := &model.FileInfo{Id: model.NewId(), Name: "voice-message-1710000000000.webm", Size: int64(len(audio)), MimeType: "audio/webm"}
 	createdPost := &model.Post{Id: model.NewId(), UserId: userID, ChannelId: channelID, RootId: rootID, FileIds: []string{fileInfo.Id}}
 
 	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
@@ -390,7 +391,7 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	api.On("GetPost", rootID).Return(&model.Post{Id: rootID, ChannelId: channelID}, (*model.AppError)(nil))
 	api.On(
 		"UploadFile",
-		mock.MatchedBy(func(data []byte) bool { return string(data) == "abc" }),
+		mock.MatchedBy(func(data []byte) bool { return bytes.Equal(data, audio) }),
 		channelID,
 		mock.MatchedBy(func(filename string) bool {
 			return strings.HasPrefix(filename, "voice-message-") && strings.HasSuffix(filename, ".webm") && model.IsValidFilename(filename)
@@ -414,7 +415,7 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 		"root_id":     rootID,
 		"duration_ms": "1234",
 		"waveform":    `[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.2,0.3,0.4,0.5,0.6]`,
-	}, "voice.webm", "audio/webm", []byte("abc"))
+	}, "voice.webm", "audio/webm", audio)
 	req.Header.Set("Mattermost-User-ID", userID)
 	rec := httptest.NewRecorder()
 
@@ -449,7 +450,7 @@ func TestHandleCreateVoiceMessageStoresTranscriptWhenEnabled(t *testing.T) {
 		"channel_id":  channelID,
 		"duration_ms": "1234",
 		"transcript":  "hello",
-	}, "voice.webm", "audio/webm", []byte("abc"))
+	}, "voice.webm", "audio/webm", validWebMAudioBytes())
 	req.Header.Set("Mattermost-User-ID", userID)
 	rec := httptest.NewRecorder()
 
@@ -482,7 +483,7 @@ func TestHandleCreateVoiceMessageIgnoresTranscriptWhenDisabled(t *testing.T) {
 		"channel_id":  channelID,
 		"duration_ms": "1234",
 		"transcript":  "hello",
-	}, "voice.webm", "audio/webm", []byte("abc"))
+	}, "voice.webm", "audio/webm", validWebMAudioBytes())
 	req.Header.Set("Mattermost-User-ID", userID)
 	rec := httptest.NewRecorder()
 

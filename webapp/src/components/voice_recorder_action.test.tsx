@@ -7,7 +7,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import React from "react";
-import { waveformBarCount } from "../audio/waveform";
+import {
+  extractWaveformPeaksFromBlob,
+  waveformBarCount,
+} from "../audio/waveform";
 import { VoiceRecorderAction } from "./voice_recorder_action";
 
 vi.mock("../audio/waveform", async (importOriginal) => {
@@ -216,6 +219,7 @@ describe("VoiceRecorderAction", () => {
   it("records, reviews, and sends voice message form data", async () => {
     const track = { stop: vi.fn() };
     installRecorderEnvironment(track);
+    vi.mocked(extractWaveformPeaksFromBlob).mockClear();
 
     render(
       <VoiceRecorderAction
@@ -241,6 +245,7 @@ describe("VoiceRecorderAction", () => {
     expect(JSON.parse(String(formData.get("waveform")))).toHaveLength(
       waveformBarCount,
     );
+    expect(extractWaveformPeaksFromBlob).toHaveBeenCalledTimes(1);
   });
 
   it("shows only the mic icon while waiting for browser permission", async () => {

@@ -1,6 +1,5 @@
 import React, { useEffect, useReducer, useRef } from "react";
 import {
-  extractWaveformPeaksFromUrl,
   getRenderableWaveformPeaks,
   peakToBarHeightPercent,
   type WaveformPeaks,
@@ -26,7 +25,6 @@ type PlayerState = {
   playing: boolean;
   speed: PlaybackSpeed;
   audioError: boolean;
-  waveform?: WaveformPeaks;
 };
 
 type PlayerAction =
@@ -37,8 +35,7 @@ type PlayerAction =
   | { type: "paused" }
   | { type: "ended"; durationMs: number }
   | { type: "speed-changed"; speed: PlaybackSpeed }
-  | { type: "audio-error" }
-  | { type: "waveform-loaded"; waveform: WaveformPeaks };
+  | { type: "audio-error" };
 
 const initialPlayerState: PlayerState = {
   metadataDurationMs: 0,
@@ -92,11 +89,6 @@ function playerReducer(state: PlayerState, action: PlayerAction): PlayerState {
         audioError: true,
         playing: false,
       };
-    case "waveform-loaded":
-      return {
-        ...state,
-        waveform: action.waveform,
-      };
   }
 }
 
@@ -143,7 +135,7 @@ export function VoiceAudioPlayer({
   const activeWaveformBars = Math.round(
     (progressPercent / 100) * waveformBars.length,
   );
-  const waveformPeaks = getRenderableWaveformPeaks(waveform ?? state.waveform);
+  const waveformPeaks = getRenderableWaveformPeaks(waveform);
   const waveformBarsWithIds = waveformPeaks.map((peak, index) => ({
     active: index < activeWaveformBars,
     id: `waveform-bar-${index}`,
@@ -200,23 +192,6 @@ export function VoiceAudioPlayer({
       }
     };
   }, [src, durationMs]);
-
-  useEffect(() => {
-    if (waveform || !src) {
-      return undefined;
-    }
-
-    const abortController = new AbortController();
-    void extractWaveformPeaksFromUrl(src, abortController.signal).then(
-      (peaks) => {
-        if (peaks && !abortController.signal.aborted) {
-          dispatch({ type: "waveform-loaded", waveform: peaks });
-        }
-      },
-    );
-
-    return () => abortController.abort();
-  }, [src, waveform]);
 
   async function playVoiceMessage() {
     const audio = audioRef.current;

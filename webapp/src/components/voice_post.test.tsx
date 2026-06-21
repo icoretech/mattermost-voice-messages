@@ -111,6 +111,26 @@ describe("VoicePostComponent", () => {
   });
 
   it("renders a skinned waveform scrubber", () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("audio"));
+    vi.stubGlobal("fetch", fetchMock);
+    const arrayBufferSpy = vi.spyOn(Response.prototype, "arrayBuffer");
+    const decodeAudioData = vi.fn();
+    class FakeWaveformAudioContext {
+      public async decodeAudioData() {
+        decodeAudioData();
+        return {
+          getChannelData: () => new Float32Array(),
+          length: 0,
+          numberOfChannels: 0,
+        };
+      }
+
+      public async close() {
+        return undefined;
+      }
+    }
+    vi.stubGlobal("AudioContext", FakeWaveformAudioContext);
+
     render(
       <VoicePostComponent
         post={makePost({
@@ -126,9 +146,15 @@ describe("VoicePostComponent", () => {
     expect(
       screen.getByRole("slider", { name: "Voice message progress" }),
     ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(arrayBufferSpy).not.toHaveBeenCalled();
+    expect(decodeAudioData).not.toHaveBeenCalled();
   });
 
   it("uses persisted waveform peaks for bar heights", () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("audio"));
+    vi.stubGlobal("fetch", fetchMock);
+
     render(
       <VoicePostComponent
         post={makePost({
@@ -148,6 +174,7 @@ describe("VoicePostComponent", () => {
     );
     expect(bars[0]).toHaveStyle({ height: "12%" });
     expect(bars[23]).toHaveStyle({ height: "100%" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("seeks through the waveform scrubber", () => {
