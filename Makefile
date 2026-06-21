@@ -1,5 +1,6 @@
 GO ?= $(shell command -v go 2> /dev/null)
 NPM ?= $(shell command -v npm 2> /dev/null)
+GO_PACKAGES ?= ./build/... ./server/...
 CURL ?= $(shell command -v curl 2> /dev/null)
 MM_DEBUG ?=
 GOPATH ?= $(shell go env GOPATH)
@@ -198,8 +199,8 @@ endif
 # weird reports at golangci-lint step
 ifneq ($(HAS_SERVER),)
 	@echo Running golangci-lint
-	$(GO) vet ./...
-	$(GOBIN)/golangci-lint run ./...
+	$(GO) vet $(GO_PACKAGES)
+	$(GOBIN)/golangci-lint run $(GO_PACKAGES)
 endif
 
 ## Builds the server, if it exists, for all supported architectures, unless MM_SERVICESETTINGS_ENABLEDEVELOPER is set.
@@ -342,7 +343,7 @@ detach: setup-attach
 .PHONY: test
 test: apply webapp/node_modules install-go-tools
 ifneq ($(HAS_SERVER),)
-	$(GOBIN)/gotestsum -- -v ./...
+	$(GOBIN)/gotestsum -- -v $(GO_PACKAGES)
 endif
 ifneq ($(HAS_WEBAPP),)
 	cd webapp && $(NPM) run test;
@@ -353,7 +354,7 @@ endif
 .PHONY: test-ci
 test-ci: apply webapp/node_modules install-go-tools
 ifneq ($(HAS_SERVER),)
-	$(GOBIN)/gotestsum --format standard-verbose --junitfile report.xml -- ./...
+	$(GOBIN)/gotestsum --format standard-verbose --junitfile report.xml -- $(GO_PACKAGES)
 endif
 ifneq ($(HAS_WEBAPP),)
 	cd webapp && $(NPM) run test;

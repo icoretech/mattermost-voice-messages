@@ -155,4 +155,4 @@ docker compose -f docker-compose.dev.yml config
 cd webapp && npm run typecheck && npm run biome:ci && npm run react-doctor && npm run test && npm run build
 ```
 
-Run `make manifest-check`, `go vet ./...`, `go test -race ./...`, and `make dist` when plugin code changed or before packaging.
+Run `make manifest-check`, `go vet ./build/... ./server/...`, `go test -race ./build/... ./server/...`, and `make dist` when plugin code changed or before packaging.
