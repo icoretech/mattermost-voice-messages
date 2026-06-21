@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"os"
 	"strings"
 	"testing"
 
@@ -17,6 +18,25 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type voiceMessageUploadContract struct {
+	AudioField          string            `json:"audio_field"`
+	FileName            string            `json:"file_name"`
+	FileMimeType        string            `json:"file_mime_type"`
+	TextFields          map[string]string `json:"text_fields"`
+	ForbiddenTextFields []string          `json:"forbidden_text_fields"`
+}
+
+func loadVoiceMessageUploadContract(t *testing.T) voiceMessageUploadContract {
+	t.Helper()
+
+	data, err := os.ReadFile("../testdata/voice_message_upload_contract.json")
+	require.NoError(t, err)
+
+	var contract voiceMessageUploadContract
+	require.NoError(t, json.Unmarshal(data, &contract))
+	return contract
+}
 
 func TestDetectVoiceAudioAcceptsSupportedTypes(t *testing.T) {
 	testCases := []struct {
@@ -196,6 +216,44 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 			assert.Equal(t, tc.wantBody, handlerErr.message)
 		})
 	}
+}
+
+func TestParseVoiceMessageRequestRejectsMalformedMultipart(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice-messages", strings.NewReader("not multipart"))
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=missing")
+
+	_, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, false)
+
+	require.NotNil(t, handlerErr)
+	assert.Equal(t, http.StatusBadRequest, handlerErr.status)
+	assert.Equal(t, "Invalid multipart form", handlerErr.message)
+}
+
+func TestParseVoiceMessageRequestAcceptsClientUploadContract(t *testing.T) {
+	contract := loadVoiceMessageUploadContract(t)
+	for _, field := range contract.ForbiddenTextFields {
+		assert.NotContains(t, contract.TextFields, field)
+	}
+
+	req := newVoiceMultipartRequestWithAudioField(
+		t,
+		contract.TextFields,
+		contract.AudioField,
+		contract.FileName,
+		contract.FileMimeType,
+		[]byte("abc"),
+	)
+
+	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, true)
+
+	require.Nil(t, handlerErr)
+	assert.Equal(t, contract.TextFields["channel_id"], parsed.channelID)
+	assert.Equal(t, contract.TextFields["root_id"], parsed.rootID)
+	assert.Equal(t, int64(1234), parsed.durationMS)
+	assert.Equal(t, contract.FileMimeType, parsed.mimeType)
+	assert.Equal(t, contract.TextFields["transcript"], parsed.transcript)
+	assert.Equal(t, []byte("abc"), parsed.data)
+	assert.Len(t, parsed.waveform, voiceWaveformBarCount)
 }
 
 func TestParseVoiceMessageRequestReturnsValidatedAudio(t *testing.T) {
@@ -437,6 +495,12 @@ func TestHandleCreateVoiceMessageIgnoresTranscriptWhenDisabled(t *testing.T) {
 func newVoiceMultipartRequest(t *testing.T, fields map[string]string, fileName string, contentType string, file []byte) *http.Request {
 	t.Helper()
 
+	return newVoiceMultipartRequestWithAudioField(t, fields, "audio", fileName, contentType, file)
+}
+
+func newVoiceMultipartRequestWithAudioField(t *testing.T, fields map[string]string, audioField string, fileName string, contentType string, file []byte) *http.Request {
+	t.Helper()
+
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	for name, value := range fields {
@@ -444,7 +508,7 @@ func newVoiceMultipartRequest(t *testing.T, fields map[string]string, fileName s
 	}
 	if fileName != "" {
 		header := textproto.MIMEHeader{}
-		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="audio"; filename="%s"`, fileName))
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, audioField, fileName))
 		if contentType != "" {
 			header.Set("Content-Type", contentType)
 		}

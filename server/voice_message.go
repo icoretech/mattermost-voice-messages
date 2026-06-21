@@ -27,6 +27,19 @@ type voiceMessageRequest struct {
 	transcript string
 }
 
+type voiceMessageFormFields struct {
+	channelID  string
+	rootID     string
+	durationMS int64
+	waveform   []any
+	transcript string
+}
+
+type voiceAudioPart struct {
+	data     []byte
+	mimeType string
+}
+
 type voiceMessageResponse struct {
 	Post     *model.Post     `json:"post"`
 	FileInfo *model.FileInfo `json:"file_info"`
@@ -112,31 +125,53 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript b
 		if strings.Contains(err.Error(), "http: request body too large") {
 			return voiceMessageRequest{}, &handlerError{message: "Voice message too large", status: http.StatusRequestEntityTooLarge}
 		}
-		return voiceMessageRequest{}, &handlerError{message: "Missing audio file", status: http.StatusBadRequest}
+		return voiceMessageRequest{}, &handlerError{message: "Invalid multipart form", status: http.StatusBadRequest}
 	}
 
+	fields, handlerErr := parseVoiceMessageFormFields(r, allowTranscript)
+	if handlerErr != nil {
+		return voiceMessageRequest{}, handlerErr
+	}
+
+	audio, handlerErr := parseVoiceAudioPart(r, maxBytes)
+	if handlerErr != nil {
+		return voiceMessageRequest{}, handlerErr
+	}
+
+	return voiceMessageRequest{
+		channelID:  fields.channelID,
+		rootID:     fields.rootID,
+		durationMS: fields.durationMS,
+		mimeType:   audio.mimeType,
+		waveform:   fields.waveform,
+		data:       audio.data,
+		transcript: fields.transcript,
+	}, nil
+}
+
+func parseVoiceMessageFormFields(r *http.Request, allowTranscript bool) (voiceMessageFormFields, *handlerError) {
 	channelID := r.FormValue("channel_id")
 	if !model.IsValidId(channelID) {
-		return voiceMessageRequest{}, &handlerError{message: "Invalid channel_id", status: http.StatusBadRequest}
+		return voiceMessageFormFields{}, &handlerError{message: "Invalid channel_id", status: http.StatusBadRequest}
 	}
 
 	rootID := r.FormValue("root_id")
 	if rootID != "" && !model.IsValidId(rootID) {
-		return voiceMessageRequest{}, &handlerError{message: "Invalid root_id", status: http.StatusBadRequest}
+		return voiceMessageFormFields{}, &handlerError{message: "Invalid root_id", status: http.StatusBadRequest}
 	}
 
 	durationMS := int64(0)
 	if durationValue := r.FormValue("duration_ms"); durationValue != "" {
 		parsed, err := strconv.ParseInt(durationValue, 10, 64)
 		if err != nil || parsed < 0 || parsed > maxVoiceMessageDurationMS {
-			return voiceMessageRequest{}, &handlerError{message: "Invalid duration_ms", status: http.StatusBadRequest}
+			return voiceMessageFormFields{}, &handlerError{message: "Invalid duration_ms", status: http.StatusBadRequest}
 		}
 		durationMS = parsed
 	}
 
 	waveform, handlerErr := parseVoiceWaveform(r.FormValue("waveform"))
 	if handlerErr != nil {
-		return voiceMessageRequest{}, handlerErr
+		return voiceMessageFormFields{}, handlerErr
 	}
 
 	transcript := ""
@@ -144,9 +179,13 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript b
 		transcript = normalizeVoiceTranscript(r.FormValue("transcript"))
 	}
 
+	return voiceMessageFormFields{channelID: channelID, rootID: rootID, durationMS: durationMS, waveform: waveform, transcript: transcript}, nil
+}
+
+func parseVoiceAudioPart(r *http.Request, maxBytes int64) (parsed voiceAudioPart, handlerErr *handlerError) {
 	file, header, err := r.FormFile("audio")
 	if err != nil {
-		return voiceMessageRequest{}, &handlerError{message: "Missing audio file", status: http.StatusBadRequest}
+		return voiceAudioPart{}, &handlerError{message: "Missing audio file", status: http.StatusBadRequest}
 	}
 	defer func() {
 		if err := file.Close(); err != nil && handlerErr == nil {
@@ -156,7 +195,7 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript b
 
 	data, handlerErr := readVoiceAudioData(file, maxBytes)
 	if handlerErr != nil {
-		return voiceMessageRequest{}, handlerErr
+		return voiceAudioPart{}, handlerErr
 	}
 
 	contentType := ""
@@ -168,18 +207,10 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript b
 	}
 	mimeType, _, ok := detectVoiceAudio(contentType)
 	if !ok {
-		return voiceMessageRequest{}, &handlerError{message: "Unsupported audio type", status: http.StatusUnsupportedMediaType}
+		return voiceAudioPart{}, &handlerError{message: "Unsupported audio type", status: http.StatusUnsupportedMediaType}
 	}
 
-	return voiceMessageRequest{
-		channelID:  channelID,
-		rootID:     rootID,
-		durationMS: durationMS,
-		mimeType:   mimeType,
-		waveform:   waveform,
-		data:       data,
-		transcript: transcript,
-	}, nil
+	return voiceAudioPart{data: data, mimeType: mimeType}, nil
 }
 
 func normalizeVoiceTranscript(value string) string {
