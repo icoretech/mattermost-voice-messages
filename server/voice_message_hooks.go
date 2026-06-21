@@ -1,6 +1,8 @@
 package main
 
 import (
+	"maps"
+
 	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
@@ -38,9 +40,7 @@ func (p *Plugin) MessageWillBePosted(_ *plugin.Context, post *model.Post) (*mode
 	}
 
 	props := model.StringInterface{}
-	for key, value := range post.Props {
-		props[key] = value
-	}
+	maps.Copy(props, post.Props)
 	props["voice_message"] = buildVoiceMessageProps(fileInfo, mimeType, 0, fileInfo.Size, nil)
 	updated.Props = props
 

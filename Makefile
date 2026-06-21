@@ -179,6 +179,14 @@ manifest-check:
 apply:
 	./build/bin/manifest apply
 
+## Fails when Go's fix tool has pending source updates.
+.PHONY: go-fix-check
+go-fix-check: apply
+ifneq ($(HAS_SERVER),)
+	@echo Checking for pending go fix rewrites
+	$(GO) fix -diff $(GO_PACKAGES)
+endif
+
 ## Install go tools
 install-go-tools:
 	@echo Installing go tools
@@ -187,7 +195,7 @@ install-go-tools:
 
 ## Runs eslint and golangci-lint
 .PHONY: check-style
-check-style: manifest-check apply webapp/node_modules install-go-tools
+check-style: manifest-check go-fix-check webapp/node_modules install-go-tools
 	@echo Checking for style guide compliance
 
 ifneq ($(HAS_WEBAPP),)

@@ -361,7 +361,7 @@ func TestHandleCreateVoiceMessageRejectsDisabledVoiceMessages(t *testing.T) {
 	api := &plugintest.API{}
 	p := &Plugin{}
 	p.SetAPI(api)
-	p.setConfiguration(&configuration{EnableVoiceMessages: boolPtr(false)})
+	p.setConfiguration(&configuration{EnableVoiceMessages: new(false)})
 	p.router = p.initRouter()
 	req := newVoiceMultipartRequest(t, map[string]string{"channel_id": model.NewId()}, "voice.webm", "audio/webm", validWebMAudioBytes())
 	req.Header.Set("Mattermost-User-ID", model.NewId())
@@ -431,7 +431,7 @@ func TestHandleCreateVoiceMessageStoresTranscriptWhenEnabled(t *testing.T) {
 	api := &plugintest.API{}
 	p := &Plugin{}
 	p.SetAPI(api)
-	p.setConfiguration(&configuration{EnableClientTranscription: boolPtr(true)})
+	p.setConfiguration(&configuration{EnableClientTranscription: new(true)})
 	p.router = p.initRouter()
 	userID := model.NewId()
 	channelID := model.NewId()
@@ -464,7 +464,7 @@ func TestHandleCreateVoiceMessageIgnoresTranscriptWhenDisabled(t *testing.T) {
 	api := &plugintest.API{}
 	p := &Plugin{}
 	p.SetAPI(api)
-	p.setConfiguration(&configuration{EnableClientTranscription: boolPtr(false)})
+	p.setConfiguration(&configuration{EnableClientTranscription: new(false)})
 	p.router = p.initRouter()
 	userID := model.NewId()
 	channelID := model.NewId()

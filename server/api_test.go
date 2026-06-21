@@ -45,8 +45,8 @@ func TestMattermostAuthRequiredPassesAuthenticatedRequest(t *testing.T) {
 func TestServeHTTPRoutesConfigBehindMattermostAuth(t *testing.T) {
 	p := &Plugin{}
 	p.setConfiguration(&configuration{
-		EnableVoiceMessages:       boolPtr(false),
-		EnableClientTranscription: boolPtr(true),
+		EnableVoiceMessages:       new(false),
+		EnableClientTranscription: new(true),
 		ClientTranscriptionModel:  "whisper-base",
 	})
 	p.router = p.initRouter()

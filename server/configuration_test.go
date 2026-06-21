@@ -9,10 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
 func defaultClientConfiguration() clientConfiguration {
 	return clientConfiguration{
 		VoiceMessagesEnabled:            true,
@@ -33,10 +29,10 @@ func TestGetConfigurationReturnsEmptyDefault(t *testing.T) {
 
 func TestConfigurationEffectiveBooleansRespectExplicitFalse(t *testing.T) {
 	configuration := &configuration{
-		EnableVoiceMessages:          boolPtr(false),
-		EnableUploadedAudioPreview:   boolPtr(false),
-		EnableClientTranscription:    boolPtr(true),
-		ClientTranscriptionAutoStart: boolPtr(true),
+		EnableVoiceMessages:          new(false),
+		EnableUploadedAudioPreview:   new(false),
+		EnableClientTranscription:    new(true),
+		ClientTranscriptionAutoStart: new(true),
 	}
 
 	assert.False(t, configuration.voiceMessagesEnabled())
@@ -114,7 +110,7 @@ func TestOnConfigurationChangeLoadsConfiguration(t *testing.T) {
 
 	api.On("LoadPluginConfiguration", mock.AnythingOfType("*main.configuration")).Run(func(args mock.Arguments) {
 		configuration := args.Get(0).(*configuration)
-		configuration.EnableClientTranscription = boolPtr(true)
+		configuration.EnableClientTranscription = new(true)
 		configuration.ClientTranscriptionModel = "whisper-base"
 	}).Return(nil)
 

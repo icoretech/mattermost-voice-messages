@@ -52,7 +52,7 @@ func TestMessageWillBePostedSkipsWhenUploadedAudioPreviewDisabled(t *testing.T) 
 	api := &plugintest.API{}
 	p := &Plugin{}
 	p.SetAPI(api)
-	p.setConfiguration(&configuration{EnableUploadedAudioPreview: boolPtr(false)})
+	p.setConfiguration(&configuration{EnableUploadedAudioPreview: new(false)})
 
 	updated, rejection := p.MessageWillBePosted(nil, &model.Post{
 		Id:      model.NewId(),
