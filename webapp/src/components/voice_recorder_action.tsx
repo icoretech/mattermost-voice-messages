@@ -2,6 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { uploadVoiceMessage } from "../api";
 import {
+  useVoiceMessagesClientConfig,
+  type VoiceMessagesClientConfig,
+} from "../client_config";
+import {
+  type LocalTranscriptionProgress,
+  transcribeVoiceMessageBlob,
+} from "../client_transcription";
+import {
   maxVoiceMessageBytes,
   maxVoiceMessageDurationMs,
   minVoiceMessageDurationMs,
@@ -28,7 +36,10 @@ type RecorderStatus =
   | "uploading"
   | "error";
 
+type TranscriptionStatus = "idle" | "transcribing" | "error";
+
 type ReviewRecording = {
+  id: number;
   blob: Blob;
   durationMs: number;
   mimeType: string;
@@ -42,10 +53,17 @@ type RecorderController = {
   elapsedMs: number;
   review: ReviewRecording | null;
   recordingSupported: boolean;
+  transcript: string;
+  transcriptionStatus: TranscriptionStatus;
+  transcriptionError: string;
+  transcriptionProgressLabel: string;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   cancelRecording: () => void;
   sendRecording: () => Promise<void>;
+  setTranscript: (transcript: string) => void;
+  startTranscription: () => Promise<void>;
+  cancelTranscription: () => void;
 };
 
 function formatElapsedTime(milliseconds: number): string {
@@ -53,6 +71,12 @@ function formatElapsedTime(milliseconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatTranscriptionProgress(
+  progress: LocalTranscriptionProgress,
+): string {
+  return `${progress.stage} ${Math.round(progress.progress * 100)}%`;
 }
 
 function findComposerActionsTarget(anchor: HTMLElement | null) {
@@ -87,11 +111,18 @@ function useComposerActionsTarget(
 
 function useVoiceRecorderController(
   draft: VoiceRecorderActionProps["draft"],
+  config: VoiceMessagesClientConfig,
 ): RecorderController {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [error, setError] = useState("");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [review, setReview] = useState<ReviewRecording | null>(null);
+  const [transcript, setTranscript] = useState("");
+  const [transcriptionStatus, setTranscriptionStatus] =
+    useState<TranscriptionStatus>("idle");
+  const [transcriptionError, setTranscriptionError] = useState("");
+  const [transcriptionProgressLabel, setTranscriptionProgressLabel] =
+    useState("");
   const [uploadAbortController, setUploadAbortController] =
     useState<AbortController | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -100,6 +131,9 @@ function useVoiceRecorderController(
   const startedAtRef = useRef(0);
   const recordingSupported = isRecordingSupported();
   const stoppedDurationMsRef = useRef<number | null>(null);
+  const reviewSequenceRef = useRef(0);
+  const autoStartedReviewRef = useRef<number | null>(null);
+  const transcriptionAbortControllerRef = useRef<AbortController | null>(null);
 
   const stopStream = useCallback(() => {
     for (const track of streamRef.current?.getTracks() ?? []) {
@@ -107,6 +141,20 @@ function useVoiceRecorderController(
     }
     streamRef.current = null;
   }, []);
+
+  const abortActiveTranscription = useCallback(() => {
+    transcriptionAbortControllerRef.current?.abort();
+    transcriptionAbortControllerRef.current = null;
+  }, []);
+
+  const resetTranscriptionState = useCallback(() => {
+    abortActiveTranscription();
+    autoStartedReviewRef.current = null;
+    setTranscript("");
+    setTranscriptionStatus("idle");
+    setTranscriptionError("");
+    setTranscriptionProgressLabel("");
+  }, [abortActiveTranscription]);
 
   useEffect(() => {
     if (status !== "recording") {
@@ -131,6 +179,10 @@ function useVoiceRecorderController(
   useEffect(() => {
     return () => stopStream();
   }, [stopStream]);
+
+  useEffect(() => {
+    return () => abortActiveTranscription();
+  }, [abortActiveTranscription]);
 
   useEffect(() => {
     if (!uploadAbortController) {
@@ -176,10 +228,20 @@ function useVoiceRecorderController(
       return;
     }
 
+    abortActiveTranscription();
+    setTranscript("");
+    setTranscriptionStatus("idle");
+    setTranscriptionError("");
+    setTranscriptionProgressLabel("");
+    autoStartedReviewRef.current = null;
+
     const waveform =
       (await extractWaveformPeaksFromBlob(blob)) ??
       getRenderableWaveformPeaks(undefined);
+    const reviewId = reviewSequenceRef.current + 1;
+    reviewSequenceRef.current = reviewId;
     setReview({
+      id: reviewId,
       blob,
       durationMs,
       mimeType,
@@ -203,6 +265,7 @@ function useVoiceRecorderController(
     }
 
     setError("");
+    resetTranscriptionState();
     clearReview();
     setStatus("requesting-permission");
 
@@ -247,6 +310,7 @@ function useVoiceRecorderController(
     recorder.onerror = () => {
       stopStream();
       resetRecorder();
+      resetTranscriptionState();
       setError("Could not record voice message");
       setStatus("error");
     };
@@ -273,6 +337,7 @@ function useVoiceRecorderController(
 
     stopStream();
     resetRecorder();
+    resetTranscriptionState();
     setStatus("idle");
   }
 
@@ -288,9 +353,111 @@ function useVoiceRecorderController(
     stopStream();
     resetRecorder();
     clearReview();
+    resetTranscriptionState();
     setError("");
     setStatus("idle");
   }
+
+  const startTranscription = useCallback(
+    async (targetReview?: ReviewRecording) => {
+      const activeReview = targetReview ?? review;
+      if (!config.clientTranscriptionEnabled || !activeReview) {
+        return;
+      }
+
+      abortActiveTranscription();
+      const abortController = new AbortController();
+      transcriptionAbortControllerRef.current = abortController;
+      const reviewId = activeReview.id;
+
+      setTranscriptionStatus("transcribing");
+      setTranscriptionError("");
+      setTranscriptionProgressLabel("loading 0%");
+
+      const updateIfCurrent = (callback: () => void) => {
+        if (
+          abortController.signal.aborted ||
+          reviewSequenceRef.current !== reviewId
+        ) {
+          return;
+        }
+        callback();
+      };
+
+      try {
+        const text = await transcribeVoiceMessageBlob(
+          activeReview.blob,
+          activeReview.mimeType,
+          {
+            model: config.clientTranscriptionModel,
+            quantization: config.clientTranscriptionQuantization,
+            language: config.clientTranscriptionLanguage,
+            signal: abortController.signal,
+            onProgress: (progress) =>
+              updateIfCurrent(() =>
+                setTranscriptionProgressLabel(
+                  formatTranscriptionProgress(progress),
+                ),
+              ),
+            onText: (textUpdate) =>
+              updateIfCurrent(() => setTranscript(textUpdate)),
+          },
+        );
+
+        updateIfCurrent(() => {
+          setTranscript(text);
+          setTranscriptionStatus("idle");
+          setTranscriptionError("");
+          setTranscriptionProgressLabel("");
+        });
+      } catch (transcriptionError) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        updateIfCurrent(() => {
+          setTranscriptionStatus("error");
+          setTranscriptionError(
+            transcriptionError instanceof Error
+              ? transcriptionError.message
+              : "Could not transcribe voice message",
+          );
+          setTranscriptionProgressLabel("");
+        });
+      } finally {
+        if (transcriptionAbortControllerRef.current === abortController) {
+          transcriptionAbortControllerRef.current = null;
+        }
+      }
+    },
+    [
+      abortActiveTranscription,
+      config.clientTranscriptionEnabled,
+      config.clientTranscriptionLanguage,
+      config.clientTranscriptionModel,
+      config.clientTranscriptionQuantization,
+      review,
+    ],
+  );
+
+  useEffect(() => {
+    if (
+      !config.clientTranscriptionEnabled ||
+      !config.clientTranscriptionAutoStart ||
+      !review ||
+      autoStartedReviewRef.current === review.id
+    ) {
+      return;
+    }
+
+    autoStartedReviewRef.current = review.id;
+    void startTranscription(review);
+  }, [
+    config.clientTranscriptionAutoStart,
+    config.clientTranscriptionEnabled,
+    review,
+    startTranscription,
+  ]);
 
   async function sendRecording() {
     if (!review) {
@@ -318,6 +485,7 @@ function useVoiceRecorderController(
       return;
     }
 
+    abortActiveTranscription();
     const abortController = new AbortController();
     setUploadAbortController(abortController);
     setStatus("uploading");
@@ -331,9 +499,11 @@ function useVoiceRecorderController(
         durationMs: review.durationMs,
         mimeType: review.mimeType,
         waveform: review.waveform,
+        transcript: config.clientTranscriptionEnabled ? transcript : undefined,
         signal: abortController.signal,
       });
       clearReview();
+      resetTranscriptionState();
       setStatus("idle");
     } catch (uploadError) {
       if (abortController.signal.aborted) {
@@ -352,16 +522,29 @@ function useVoiceRecorderController(
     }
   }
 
+  function cancelTranscription() {
+    abortActiveTranscription();
+    setTranscriptionStatus("idle");
+    setTranscriptionProgressLabel("");
+  }
+
   return {
     status,
     error,
     elapsedMs,
     review,
     recordingSupported,
+    transcript,
+    transcriptionStatus,
+    transcriptionError,
+    transcriptionProgressLabel,
     startRecording,
     stopRecording,
     cancelRecording,
     sendRecording,
+    setTranscript,
+    startTranscription: () => startTranscription(),
+    cancelTranscription,
   };
 }
 
@@ -414,13 +597,29 @@ function RecordingPanel({
 }
 
 function ReviewPanel({
+  clientTranscriptionEnabled,
   onCancel,
+  onCancelTranscription,
   onSend,
+  onStartTranscription,
+  onTranscriptChange,
   review,
+  transcript,
+  transcriptionError,
+  transcriptionProgressLabel,
+  transcriptionStatus,
 }: {
+  clientTranscriptionEnabled: boolean;
   onCancel: () => void;
+  onCancelTranscription: () => void;
   onSend: () => void;
+  onStartTranscription: () => void;
+  onTranscriptChange: (value: string) => void;
   review: ReviewRecording;
+  transcript: string;
+  transcriptionError: string;
+  transcriptionProgressLabel: string;
+  transcriptionStatus: TranscriptionStatus;
 }) {
   return (
     <div className="VoiceRecorderAction VoiceRecorderAction__panel VoiceRecorderAction__panel--review">
@@ -431,22 +630,86 @@ function ReviewPanel({
         waveform={review.waveform}
         variant="preview"
       />
-      <button
-        className="VoiceRecorderAction__sendButton"
-        type="button"
-        aria-label="Send voice message"
-        title="Send voice message"
-        onClick={onSend}
-      >
-        Send
-      </button>
-      <button
-        className="VoiceRecorderAction__iconButton VoiceRecorderAction__iconButton--cancel"
-        type="button"
-        aria-label="Cancel recording"
-        title="Cancel recording"
-        onClick={onCancel}
-      />
+      {clientTranscriptionEnabled ? (
+        <div className="VoiceRecorderAction__transcription">
+          {transcriptionStatus === "transcribing" ? (
+            <div className="VoiceRecorderAction__transcriptionStatus">
+              <span>Transcribing locally…</span>
+              {transcriptionProgressLabel ? (
+                <span>{transcriptionProgressLabel}</span>
+              ) : null}
+              <button
+                className="VoiceRecorderAction__transcriptionButton"
+                type="button"
+                aria-label="Cancel transcription"
+                onClick={onCancelTranscription}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : null}
+          {transcriptionStatus === "error" ? (
+            <div className="VoiceRecorderAction__transcriptionStatus VoiceRecorderAction__transcriptionStatus--error">
+              <span
+                className="VoiceRecorderAction__transcriptionAlert"
+                role="alert"
+              >
+                {transcriptionError}
+              </span>
+              <button
+                className="VoiceRecorderAction__transcriptionButton"
+                type="button"
+                aria-label="Transcribe voice message locally"
+                onClick={onStartTranscription}
+              >
+                Transcribe locally
+              </button>
+            </div>
+          ) : null}
+          {transcript ? (
+            <>
+              <textarea
+                className="VoiceRecorderAction__transcriptTextarea"
+                aria-label="Voice message transcript"
+                value={transcript}
+                onChange={(event) => onTranscriptChange(event.target.value)}
+              />
+              <span className="VoiceRecorderAction__transcriptionHelp">
+                Transcript will be sent as the message text. Edit or clear it
+                before sending.
+              </span>
+            </>
+          ) : null}
+          {transcriptionStatus === "idle" && !transcript ? (
+            <button
+              className="VoiceRecorderAction__transcriptionButton"
+              type="button"
+              aria-label="Transcribe voice message locally"
+              onClick={onStartTranscription}
+            >
+              Transcribe locally
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="VoiceRecorderAction__reviewActions">
+        <button
+          className="VoiceRecorderAction__sendButton"
+          type="button"
+          aria-label="Send voice message"
+          title="Send voice message"
+          onClick={onSend}
+        >
+          Send
+        </button>
+        <button
+          className="VoiceRecorderAction__iconButton VoiceRecorderAction__iconButton--cancel"
+          type="button"
+          aria-label="Cancel recording"
+          title="Cancel recording"
+          onClick={onCancel}
+        />
+      </div>
     </div>
   );
 }
@@ -523,8 +786,13 @@ function IdleMicButton({
 
 export function VoiceRecorderAction({ draft }: VoiceRecorderActionProps) {
   const anchorRef = useRef<HTMLSpanElement | null>(null);
-  const controller = useVoiceRecorderController(draft);
+  const { config, loading } = useVoiceMessagesClientConfig();
+  const controller = useVoiceRecorderController(draft, config);
   const portalTarget = useComposerActionsTarget(anchorRef);
+
+  if (loading || !config.voiceMessagesEnabled) {
+    return null;
+  }
 
   let content: React.ReactNode;
   switch (controller.status) {
@@ -543,9 +811,17 @@ export function VoiceRecorderAction({ draft }: VoiceRecorderActionProps) {
     case "review":
       content = controller.review ? (
         <ReviewPanel
+          clientTranscriptionEnabled={config.clientTranscriptionEnabled}
           review={controller.review}
+          transcript={controller.transcript}
+          transcriptionStatus={controller.transcriptionStatus}
+          transcriptionError={controller.transcriptionError}
+          transcriptionProgressLabel={controller.transcriptionProgressLabel}
           onCancel={controller.cancelRecording}
+          onCancelTranscription={controller.cancelTranscription}
           onSend={() => void controller.sendRecording()}
+          onStartTranscription={() => void controller.startTranscription()}
+          onTranscriptChange={controller.setTranscript}
         />
       ) : null;
       break;

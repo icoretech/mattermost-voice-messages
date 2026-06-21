@@ -7,6 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import React from "react";
+import { resetClientConfigCacheForTests } from "./client_config";
 import { VoiceRecorderAction } from "./components/voice_recorder_action";
 import { waveformBarCount } from "./waveform";
 
@@ -22,6 +23,22 @@ vi.mock("./waveform", async (importOriginal) => {
     ),
   };
 });
+
+const browserWhisperMock = vi.hoisted(() => ({
+  cancel: vi.fn(),
+  dispose: vi.fn(),
+  transcribe: vi.fn(),
+}));
+
+vi.mock("browser-whisper", () => ({
+  BrowserWhisper: vi.fn(function BrowserWhisperMock(this: {
+    dispose: typeof browserWhisperMock.dispose;
+    transcribe: typeof browserWhisperMock.transcribe;
+  }) {
+    this.dispose = browserWhisperMock.dispose;
+    this.transcribe = browserWhisperMock.transcribe;
+  }),
+}));
 
 type FakeTrack = {
   stop: ReturnType<typeof vi.fn>;
@@ -69,7 +86,63 @@ class FakeMediaRecorder {
   }
 }
 
-function installRecorderEnvironment(track: FakeTrack) {
+type ServerClientConfig = {
+  voice_messages_enabled: boolean;
+  uploaded_audio_preview_enabled: boolean;
+  client_transcription_enabled: boolean;
+  client_transcription_auto_start: boolean;
+  client_transcription_model: string;
+  client_transcription_quantization: string;
+  client_transcription_language: string;
+};
+
+const defaultServerClientConfig: ServerClientConfig = {
+  voice_messages_enabled: true,
+  uploaded_audio_preview_enabled: true,
+  client_transcription_enabled: false,
+  client_transcription_auto_start: false,
+  client_transcription_model: "whisper-tiny",
+  client_transcription_quantization: "hybrid",
+  client_transcription_language: "",
+};
+
+function defaultUploadResponse() {
+  return Response.json(
+    {
+      post: { id: "post-id" },
+      file_info: { id: "file-id" },
+    },
+    { status: 201 },
+  );
+}
+
+function installFetchMock({
+  config,
+  uploadResponse,
+}: {
+  config?: Partial<ServerClientConfig>;
+  uploadResponse?: () => Response | Promise<Response>;
+} = {}) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/v1/config")) {
+        return Response.json({ ...defaultServerClientConfig, ...config });
+      }
+
+      if (init?.method === "POST") {
+        return uploadResponse ? uploadResponse() : defaultUploadResponse();
+      }
+
+      return new Response("Unexpected request", { status: 404 });
+    }),
+  );
+}
+
+function installRecorderEnvironment(
+  track: FakeTrack,
+  options: Parameters<typeof installFetchMock>[0] = {},
+) {
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: {
@@ -79,21 +152,30 @@ function installRecorderEnvironment(track: FakeTrack) {
     },
   });
   vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            post: { id: "post-id" },
-            file_info: { id: "file-id" },
-          }),
-          { status: 201 },
-        ),
-    ),
-  );
+  vi.stubGlobal("crossOriginIsolated", true);
+  installFetchMock(options);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:voice-message");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+}
+
+function getUploadFetchCalls() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([, init]) => init?.method === "POST");
+}
+
+async function recordAndReview() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Record voice message" }),
+  );
+  expect(
+    await screen.findByRole("button", { name: "Stop recording" }),
+  ).toBeInTheDocument();
+  Date.now = vi.fn(() => 3_000);
+  fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+  expect(
+    await screen.findByRole("button", { name: "Send voice message" }),
+  ).toBeInTheDocument();
 }
 
 describe("VoiceRecorderAction", () => {
@@ -102,6 +184,14 @@ describe("VoiceRecorderAction", () => {
   const originalPause = HTMLMediaElement.prototype.pause;
 
   beforeEach(() => {
+    resetClientConfigCacheForTests();
+    browserWhisperMock.cancel.mockReset();
+    browserWhisperMock.dispose.mockReset();
+    browserWhisperMock.transcribe.mockReset();
+    browserWhisperMock.transcribe.mockReturnValue({
+      cancel: browserWhisperMock.cancel,
+      collect: vi.fn(async () => []),
+    });
     FakeMediaRecorder.instances = [];
     FakeMediaRecorder.isTypeSupported.mockReturnValue(true);
     Date.now = vi.fn(() => 1_000);
@@ -110,6 +200,7 @@ describe("VoiceRecorderAction", () => {
 
   afterEach(() => {
     cleanup();
+    resetClientConfigCacheForTests();
     vi.useRealTimers();
     Date.now = realDateNow;
     HTMLMediaElement.prototype.pause = originalPause;
@@ -133,25 +224,13 @@ describe("VoiceRecorderAction", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Record voice message" }),
-    );
-    expect(
-      await screen.findByRole("button", { name: "Stop recording" }),
-    ).toBeInTheDocument();
-
-    Date.now = vi.fn(() => 3_000);
-    fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
-    expect(
-      await screen.findByRole("button", { name: "Send voice message" }),
-    ).toBeInTheDocument();
+    await recordAndReview();
     expect(track.stop).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const [, init] = vi.mocked(fetch).mock.calls[0];
-    expect(init?.method).toBe("POST");
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const [, init] = getUploadFetchCalls()[0];
     expect(init?.credentials).toBe("same-origin");
     const formData = init?.body as FormData;
     expect(formData.get("channel_id")).toBe("channel-id");
@@ -159,12 +238,14 @@ describe("VoiceRecorderAction", () => {
     expect(formData.get("duration_ms")).toBe("2000");
     expect(formData.get("mime_type")).toBe("audio/mp4");
     expect(formData.get("audio")).toBeInstanceOf(File);
+    expect(formData.get("transcript")).toBeNull();
     expect(JSON.parse(String(formData.get("waveform")))).toHaveLength(
       waveformBarCount,
     );
   });
 
   it("shows only the mic icon while waiting for browser permission", async () => {
+    installFetchMock();
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: {
@@ -182,7 +263,7 @@ describe("VoiceRecorderAction", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Record voice message" }),
+      await screen.findByRole("button", { name: "Record voice message" }),
     );
 
     const pendingButton = await screen.findByRole("button", {
@@ -205,7 +286,7 @@ describe("VoiceRecorderAction", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Record voice message" }),
+      await screen.findByRole("button", { name: "Record voice message" }),
     );
     await screen.findByRole("button", { name: "Stop recording" });
     FakeMediaRecorder.instances[0].stopDelayMs = 100;
@@ -218,18 +299,18 @@ describe("VoiceRecorderAction", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const [, init] = vi.mocked(fetch).mock.calls[0];
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const [, init] = getUploadFetchCalls()[0];
     const formData = init?.body as FormData;
     expect(formData.get("duration_ms")).toBe("4000");
   });
 
   it("keeps the mic icon on the retry control after upload errors", async () => {
     const track = { stop: vi.fn() };
-    installRecorderEnvironment(track);
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response("Invalid duration_ms", { status: 400 }),
-    );
+    installRecorderEnvironment(track, {
+      uploadResponse: () =>
+        new Response("Invalid duration_ms", { status: 400 }),
+    });
 
     render(
       <VoiceRecorderAction
@@ -239,13 +320,7 @@ describe("VoiceRecorderAction", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Record voice message" }),
-    );
-    await screen.findByRole("button", { name: "Stop recording" });
-    Date.now = vi.fn(() => 3_000);
-    fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
-    await screen.findByRole("button", { name: "Send voice message" });
+    await recordAndReview();
     fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -270,7 +345,7 @@ describe("VoiceRecorderAction", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Record voice message" }),
+      await screen.findByRole("button", { name: "Record voice message" }),
     );
     expect(
       await screen.findByRole("button", { name: "Cancel recording" }),
@@ -278,7 +353,7 @@ describe("VoiceRecorderAction", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
 
     expect(track.stop).toHaveBeenCalledTimes(1);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(getUploadFetchCalls()).toHaveLength(0);
   });
 
   it("stops tracks when unmounted during recording", async () => {
@@ -294,7 +369,7 @@ describe("VoiceRecorderAction", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Record voice message" }),
+      await screen.findByRole("button", { name: "Record voice message" }),
     );
     expect(
       await screen.findByRole("button", { name: "Stop recording" }),
@@ -302,5 +377,150 @@ describe("VoiceRecorderAction", () => {
     unmount();
 
     expect(track.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides recorder when voice messages are disabled", async () => {
+    const track = { stop: vi.fn() };
+    installRecorderEnvironment(track, {
+      config: { voice_messages_enabled: false },
+    });
+
+    render(
+      <VoiceRecorderAction
+        draft={{ channelId: "channel-id" }}
+        getSelectedText={() => ({})}
+        updateText={() => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(
+      screen.queryByRole("button", { name: "Record voice message" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not send transcripts when transcription is disabled", async () => {
+    const track = { stop: vi.fn() };
+    installRecorderEnvironment(track);
+
+    render(
+      <VoiceRecorderAction
+        draft={{ channelId: "channel-id" }}
+        getSelectedText={() => ({})}
+        updateText={() => undefined}
+      />,
+    );
+
+    await recordAndReview();
+    fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
+
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const [, init] = getUploadFetchCalls()[0];
+    expect((init?.body as FormData).get("transcript")).toBeNull();
+  });
+
+  it("transcribes manually and sends the transcript", async () => {
+    const track = { stop: vi.fn() };
+    installRecorderEnvironment(track, {
+      config: { client_transcription_enabled: true },
+    });
+    browserWhisperMock.transcribe.mockImplementation((_file: File, options) => {
+      options.onSegment({ text: "hello" });
+      options.onSegment({ text: " world" });
+      return {
+        cancel: browserWhisperMock.cancel,
+        collect: vi.fn(async () => []),
+      };
+    });
+
+    render(
+      <VoiceRecorderAction
+        draft={{ channelId: "channel-id" }}
+        getSelectedText={() => ({})}
+        updateText={() => undefined}
+      />,
+    );
+
+    await recordAndReview();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Transcribe voice message locally",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("textbox", { name: "Voice message transcript" }),
+    ).toHaveValue("hello world");
+    fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
+
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const [, init] = getUploadFetchCalls()[0];
+    expect((init?.body as FormData).get("transcript")).toBe("hello world");
+  });
+
+  it("shows transcription errors and still sends audio", async () => {
+    const track = { stop: vi.fn() };
+    installRecorderEnvironment(track, {
+      config: { client_transcription_enabled: true },
+    });
+    browserWhisperMock.transcribe.mockImplementation(() => {
+      throw new Error("transcription failed");
+    });
+
+    render(
+      <VoiceRecorderAction
+        draft={{ channelId: "channel-id" }}
+        getSelectedText={() => ({})}
+        updateText={() => undefined}
+      />,
+    );
+
+    await recordAndReview();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Transcribe voice message locally",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "transcription failed",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
+
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const [, init] = getUploadFetchCalls()[0];
+    expect((init?.body as FormData).get("audio")).toBeInstanceOf(File);
+  });
+
+  it("auto-starts transcription after recording review is created", async () => {
+    const track = { stop: vi.fn() };
+    installRecorderEnvironment(track, {
+      config: {
+        client_transcription_enabled: true,
+        client_transcription_auto_start: true,
+      },
+    });
+    browserWhisperMock.transcribe.mockImplementation((_file: File, options) => {
+      options.onSegment({ text: "auto text" });
+      return {
+        cancel: browserWhisperMock.cancel,
+        collect: vi.fn(async () => []),
+      };
+    });
+
+    render(
+      <VoiceRecorderAction
+        draft={{ channelId: "channel-id" }}
+        getSelectedText={() => ({})}
+        updateText={() => undefined}
+      />,
+    );
+
+    await recordAndReview();
+
+    expect(
+      await screen.findByRole("textbox", { name: "Voice message transcript" }),
+    ).toHaveValue("auto text");
+    expect(browserWhisperMock.transcribe).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,6 +9,7 @@ export type UploadVoiceMessageInput = {
   durationMs: number;
   mimeType: string;
   waveform?: number[];
+  transcript?: string;
   signal?: AbortSignal;
 };
 
@@ -38,6 +39,10 @@ export async function uploadVoiceMessage(
   formData.append("mime_type", input.mimeType);
   if (input.waveform) {
     formData.append("waveform", JSON.stringify(input.waveform));
+  }
+  const transcript = input.transcript?.trim();
+  if (transcript) {
+    formData.append("transcript", transcript);
   }
 
   const response = await fetch(

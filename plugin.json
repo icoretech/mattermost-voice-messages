@@ -18,5 +18,85 @@
     },
     "webapp": {
         "bundle_path": "webapp/dist/main.js"
+    },
+    "settings_schema": {
+        "header": "Configure Mattermost Voice Messages.",
+        "footer": "Client transcription runs in the user's browser. Audio is not sent to this plugin server for transcription.",
+        "settings": [
+            {
+                "key": "EnableVoiceMessages",
+                "display_name": "Enable Voice Messages",
+                "type": "bool",
+                "help_text": "Show the microphone recorder and allow voice-message uploads.",
+                "default": true
+            },
+            {
+                "key": "EnableUploadedAudioPreview",
+                "display_name": "Enable Uploaded Audio Preview",
+                "type": "bool",
+                "help_text": "Use the voice-message player for supported audio files uploaded outside the recorder.",
+                "default": true
+            },
+            {
+                "key": "EnableClientTranscription",
+                "display_name": "Enable Client Transcription",
+                "type": "bool",
+                "help_text": "Allow users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and cross-origin isolation headers on the Mattermost site.",
+                "default": false
+            },
+            {
+                "key": "ClientTranscriptionAutoStart",
+                "display_name": "Auto-start Client Transcription",
+                "type": "bool",
+                "help_text": "When client transcription is enabled, start local transcription automatically after recording stops. When disabled, users click Transcribe locally in the review panel.",
+                "default": false
+            },
+            {
+                "key": "ClientTranscriptionModel",
+                "display_name": "Client Transcription Model",
+                "type": "dropdown",
+                "help_text": "browser-whisper model to run in the browser. Default is whisper-tiny to keep the first download light. Larger models can require hundreds of MB or GB of local model downloads.",
+                "default": "whisper-tiny",
+                "options": [
+                    {"display_name": "whisper-tiny", "value": "whisper-tiny"},
+                    {"display_name": "whisper-base", "value": "whisper-base"},
+                    {"display_name": "whisper-small", "value": "whisper-small"},
+                    {"display_name": "whisper-tiny timestamped", "value": "whisper-tiny_timestamped"},
+                    {"display_name": "whisper-base timestamped", "value": "whisper-base_timestamped"},
+                    {"display_name": "whisper-small timestamped", "value": "whisper-small_timestamped"},
+                    {"display_name": "whisper-large-v3-turbo", "value": "whisper-large-v3-turbo"},
+                    {"display_name": "whisper-large-v3-turbo timestamped", "value": "whisper-large-v3-turbo_timestamped"},
+                    {"display_name": "whisper-large-v3", "value": "whisper-large-v3"},
+                    {"display_name": "lite-whisper-large-v3-turbo-fast", "value": "lite-whisper-large-v3-turbo-fast"},
+                    {"display_name": "lite-whisper-large-v3-turbo", "value": "lite-whisper-large-v3-turbo"},
+                    {"display_name": "lite-whisper-large-v3-turbo-acc", "value": "lite-whisper-large-v3-turbo-acc"},
+                    {"display_name": "moonshine-tiny", "value": "moonshine-tiny"},
+                    {"display_name": "moonshine-base", "value": "moonshine-base"},
+                    {"display_name": "distil-whisper-small", "value": "distil-whisper-small"}
+                ]
+            },
+            {
+                "key": "ClientTranscriptionQuantization",
+                "display_name": "Client Transcription Quantization",
+                "type": "dropdown",
+                "help_text": "Model precision passed to browser-whisper. Use hybrid unless a browser/device requires a specific mode.",
+                "default": "hybrid",
+                "options": [
+                    {"display_name": "hybrid", "value": "hybrid"},
+                    {"display_name": "q4", "value": "q4"},
+                    {"display_name": "q8", "value": "q8"},
+                    {"display_name": "fp16", "value": "fp16"},
+                    {"display_name": "fp32", "value": "fp32"}
+                ]
+            },
+            {
+                "key": "ClientTranscriptionLanguage",
+                "display_name": "Client Transcription Language",
+                "type": "text",
+                "help_text": "Optional BCP-47 language tag passed to browser-whisper, for example en or it. Leave empty for auto-detect. Models without language support ignore this value.",
+                "default": "",
+                "placeholder": "auto"
+            }
+        ]
     }
 }

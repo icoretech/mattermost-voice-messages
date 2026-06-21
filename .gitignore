@@ -21,6 +21,7 @@ webapp/node_modules/
 
 # Desloppify
 .desloppify/
+scorecard.png
 
 # Dev
 dev/

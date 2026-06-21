@@ -48,6 +48,23 @@ func TestMessageWillBePostedAnnotatesSingleAudioFile(t *testing.T) {
 	api.AssertExpectations(t)
 }
 
+func TestMessageWillBePostedSkipsWhenUploadedAudioPreviewDisabled(t *testing.T) {
+	api := &plugintest.API{}
+	p := &Plugin{}
+	p.SetAPI(api)
+	p.setConfiguration(&configuration{EnableUploadedAudioPreview: boolPtr(false)})
+
+	updated, rejection := p.MessageWillBePosted(nil, &model.Post{
+		Id:      model.NewId(),
+		Type:    "",
+		FileIds: model.StringArray{model.NewId()},
+	})
+
+	assert.Nil(t, updated)
+	assert.Empty(t, rejection)
+	api.AssertExpectations(t)
+}
+
 func TestMessageWillBePostedSkipsNonVoicePosts(t *testing.T) {
 	fileID := model.NewId()
 	testCases := []struct {

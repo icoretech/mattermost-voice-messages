@@ -12,6 +12,7 @@ func (p *Plugin) initRouter() *mux.Router {
 
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
 	apiRouter.Use(p.mattermostAuthRequired)
+	apiRouter.HandleFunc("/config", p.handleGetConfig).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/voice-messages", p.handleCreateVoiceMessage).Methods(http.MethodPost)
 
 	return router

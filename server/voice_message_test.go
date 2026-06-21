@@ -68,6 +68,7 @@ func TestBuildVoiceMessagePost(t *testing.T) {
 		mimeType:   "audio/webm",
 		waveform:   []any{0.25, 0.5},
 		data:       []byte("voice data"),
+		transcript: "hello transcript",
 	}
 	fileInfo := &model.FileInfo{Id: fileID, Name: "voice-message-1710000000000.webm"}
 
@@ -77,7 +78,7 @@ func TestBuildVoiceMessagePost(t *testing.T) {
 	assert.Equal(t, channelID, post.ChannelId)
 	assert.Equal(t, rootID, post.RootId)
 	assert.Empty(t, post.Type)
-	assert.Empty(t, post.Message)
+	assert.Equal(t, "hello transcript", post.Message)
 	assert.Equal(t, model.StringArray{fileID}, post.FileIds)
 	assert.Len(t, post.Props, 1)
 	voiceMessage, ok := post.Props["voice_message"].(map[string]any)
@@ -89,6 +90,10 @@ func TestBuildVoiceMessagePost(t *testing.T) {
 	assert.Equal(t, int64(12_345), voiceMessage["duration_ms"])
 	assert.Equal(t, int64(len(req.data)), voiceMessage["size"])
 	assert.Equal(t, []any{0.25, 0.5}, voiceMessage["waveform"])
+
+	req.transcript = ""
+	post = buildVoiceMessagePost(userID, req, fileInfo)
+	assert.Empty(t, post.Message)
 }
 
 func TestBuildVoiceMessagePropsUsesFallbackFilenameAndOmitsEmptyWaveform(t *testing.T) {
@@ -184,7 +189,7 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := newVoiceMultipartRequest(t, tc.fields, tc.fileName, "audio/webm", tc.file)
 
-			_, handlerErr := parseVoiceMessageRequest(req, tc.maxBytes)
+			_, handlerErr := parseVoiceMessageRequest(req, tc.maxBytes, false)
 
 			require.NotNil(t, handlerErr)
 			assert.Equal(t, tc.wantStatus, handlerErr.status)
@@ -209,7 +214,7 @@ func TestParseVoiceMessageRequestReturnsValidatedAudio(t *testing.T) {
 		"waveform":    string(waveformJSON),
 	}, "ignored-name.webm", "audio/webm;codecs=opus", []byte("abc"))
 
-	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes)
+	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, false)
 
 	require.Nil(t, handlerErr)
 	assert.Equal(t, channelID, parsed.channelID)
@@ -218,6 +223,69 @@ func TestParseVoiceMessageRequestReturnsValidatedAudio(t *testing.T) {
 	assert.Equal(t, "audio/webm", parsed.mimeType)
 	assert.Equal(t, []byte("abc"), parsed.data)
 	assert.Equal(t, peaks[1], parsed.waveform[1])
+}
+
+func TestParseVoiceMessageRequestIgnoresTranscriptWhenDisabled(t *testing.T) {
+	req := newVoiceMultipartRequest(t, map[string]string{
+		"channel_id": model.NewId(),
+		"transcript": "hello",
+	}, "voice.webm", "audio/webm", []byte("abc"))
+
+	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, false)
+
+	require.Nil(t, handlerErr)
+	assert.Empty(t, parsed.transcript)
+}
+
+func TestParseVoiceMessageRequestNormalizesTranscriptWhenEnabled(t *testing.T) {
+	req := newVoiceMultipartRequest(t, map[string]string{
+		"channel_id": model.NewId(),
+		"transcript": "  hello\r\nworld\r  ",
+	}, "voice.webm", "audio/webm", []byte("abc"))
+
+	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, true)
+
+	require.Nil(t, handlerErr)
+	assert.Equal(t, "hello\nworld", parsed.transcript)
+}
+
+func TestParseVoiceMessageRequestTruncatesOverlongTranscript(t *testing.T) {
+	req := newVoiceMultipartRequest(t, map[string]string{
+		"channel_id": model.NewId(),
+		"transcript": strings.Repeat("a", model.PostMessageMaxRunesV2+5),
+	}, "voice.webm", "audio/webm", []byte("abc"))
+
+	parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, true)
+
+	require.Nil(t, handlerErr)
+	assert.Len(t, []rune(parsed.transcript), model.PostMessageMaxRunesV2)
+	assert.True(t, strings.HasSuffix(parsed.transcript, "…"))
+}
+
+func TestHandleGetConfigRejectsMissingUser(t *testing.T) {
+	p := &Plugin{router: (&Plugin{}).initRouter()}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/config", nil)
+	rec := httptest.NewRecorder()
+
+	p.ServeHTTP(nil, rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Not authorized")
+}
+
+func TestHandleGetConfigReturnsEffectiveDefaults(t *testing.T) {
+	p := &Plugin{router: (&Plugin{}).initRouter()}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/config", nil)
+	req.Header.Set("Mattermost-User-ID", model.NewId())
+	rec := httptest.NewRecorder()
+
+	p.ServeHTTP(nil, rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	var response clientConfiguration
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&response))
+	assert.Equal(t, defaultClientConfiguration(), response)
 }
 
 func TestHandleCreateVoiceMessageRejectsMissingUser(t *testing.T) {
@@ -231,6 +299,22 @@ func TestHandleCreateVoiceMessageRejectsMissingUser(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "Not authorized")
 }
 
+func TestHandleCreateVoiceMessageRejectsDisabledVoiceMessages(t *testing.T) {
+	api := &plugintest.API{}
+	p := &Plugin{}
+	p.SetAPI(api)
+	p.setConfiguration(&configuration{EnableVoiceMessages: boolPtr(false)})
+	p.router = p.initRouter()
+	req := newVoiceMultipartRequest(t, map[string]string{"channel_id": model.NewId()}, "voice.webm", "audio/webm", []byte("abc"))
+	req.Header.Set("Mattermost-User-ID", model.NewId())
+	rec := httptest.NewRecorder()
+
+	p.ServeHTTP(nil, rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Voice messages are disabled")
+	api.AssertExpectations(t)
+}
 func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	api := &plugintest.API{}
 	p := &Plugin{}
@@ -281,6 +365,72 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.Contains(t, rec.Body.String(), createdPost.Id)
 	assert.Contains(t, rec.Body.String(), fileInfo.Id)
+	api.AssertExpectations(t)
+}
+
+func TestHandleCreateVoiceMessageStoresTranscriptWhenEnabled(t *testing.T) {
+	api := &plugintest.API{}
+	p := &Plugin{}
+	p.SetAPI(api)
+	p.setConfiguration(&configuration{EnableClientTranscription: boolPtr(true)})
+	p.router = p.initRouter()
+	userID := model.NewId()
+	channelID := model.NewId()
+	fileInfo := &model.FileInfo{Id: model.NewId(), Name: "voice-message.webm", Size: 3, MimeType: "audio/webm"}
+	createdPost := &model.Post{Id: model.NewId(), UserId: userID, ChannelId: channelID, FileIds: []string{fileInfo.Id}, Message: "hello"}
+
+	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
+	api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
+	api.On("HasPermissionToChannel", userID, channelID, model.PermissionUploadFile).Return(true)
+	api.On("UploadFile", mock.Anything, channelID, mock.Anything).Return(fileInfo, (*model.AppError)(nil))
+	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
+		return post.Message == "hello"
+	})).Return(createdPost, (*model.AppError)(nil))
+
+	req := newVoiceMultipartRequest(t, map[string]string{
+		"channel_id":  channelID,
+		"duration_ms": "1234",
+		"transcript":  "hello",
+	}, "voice.webm", "audio/webm", []byte("abc"))
+	req.Header.Set("Mattermost-User-ID", userID)
+	rec := httptest.NewRecorder()
+
+	p.ServeHTTP(nil, rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	api.AssertExpectations(t)
+}
+
+func TestHandleCreateVoiceMessageIgnoresTranscriptWhenDisabled(t *testing.T) {
+	api := &plugintest.API{}
+	p := &Plugin{}
+	p.SetAPI(api)
+	p.setConfiguration(&configuration{EnableClientTranscription: boolPtr(false)})
+	p.router = p.initRouter()
+	userID := model.NewId()
+	channelID := model.NewId()
+	fileInfo := &model.FileInfo{Id: model.NewId(), Name: "voice-message.webm", Size: 3, MimeType: "audio/webm"}
+	createdPost := &model.Post{Id: model.NewId(), UserId: userID, ChannelId: channelID, FileIds: []string{fileInfo.Id}}
+
+	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
+	api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
+	api.On("HasPermissionToChannel", userID, channelID, model.PermissionUploadFile).Return(true)
+	api.On("UploadFile", mock.Anything, channelID, mock.Anything).Return(fileInfo, (*model.AppError)(nil))
+	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
+		return post.Message == ""
+	})).Return(createdPost, (*model.AppError)(nil))
+
+	req := newVoiceMultipartRequest(t, map[string]string{
+		"channel_id":  channelID,
+		"duration_ms": "1234",
+		"transcript":  "hello",
+	}, "voice.webm", "audio/webm", []byte("abc"))
+	req.Header.Set("Mattermost-User-ID", userID)
+	rec := httptest.NewRecorder()
+
+	p.ServeHTTP(nil, rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
 	api.AssertExpectations(t)
 }
 

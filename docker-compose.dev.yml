@@ -4,8 +4,8 @@ services:
     platform: linux/amd64
     container_name: mattermost-voice-messages-dev
     restart: unless-stopped
-    ports:
-      - "${MATTERMOST_DEV_PORT:-18065}:8065"
+    expose:
+      - "8065"
     environment:
       MM_SERVICESETTINGS_SITEURL: "${MATTERMOST_DEV_SITE_URL:-http://localhost:18065}"
       MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
@@ -18,6 +18,17 @@ services:
     volumes:
       - mattermost-data:/mm/mattermost-data
       - mattermost-postgres:/var/lib/postgresql/data
+
+  mattermost-proxy:
+    image: nginx:alpine
+    container_name: mattermost-voice-messages-dev-proxy
+    restart: unless-stopped
+    depends_on:
+      - mattermost
+    ports:
+      - "${MATTERMOST_DEV_PORT:-18065}:8065"
+    volumes:
+      - ./docker/nginx/mattermost-dev.conf:/etc/nginx/nginx.conf:ro
 
 volumes:
   mattermost-data:

@@ -19,10 +19,13 @@ export function normalizeWaveformPeaks(
     return undefined;
   }
 
-  const peaks = value
-    .map((peak) => (typeof peak === "number" ? peak : Number(peak)))
-    .filter((peak) => Number.isFinite(peak))
-    .map((peak) => Math.min(1, Math.max(0, peak)));
+  const peaks: number[] = [];
+  for (const valuePeak of value) {
+    const peak = typeof valuePeak === "number" ? valuePeak : Number(valuePeak);
+    if (Number.isFinite(peak)) {
+      peaks.push(Math.min(1, Math.max(0, peak)));
+    }
+  }
   if (peaks.length === 0) {
     return undefined;
   }

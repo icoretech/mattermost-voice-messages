@@ -18,6 +18,9 @@ func (p *Plugin) MessageWillBePosted(_ *plugin.Context, post *model.Post) (*mode
 	if len(post.FileIds) != 1 {
 		return nil, ""
 	}
+	if !p.getConfiguration().uploadedAudioPreviewEnabled() {
+		return nil, ""
+	}
 
 	fileInfo, appErr := p.API.GetFileInfo(post.FileIds[0])
 	if appErr != nil || fileInfo == nil {

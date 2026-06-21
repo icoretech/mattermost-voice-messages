@@ -24,6 +24,7 @@ type voiceMessageRequest struct {
 	mimeType   string
 	waveform   []any
 	data       []byte
+	transcript string
 }
 
 type voiceMessageResponse struct {
@@ -43,8 +44,14 @@ func (p *Plugin) handleCreateVoiceMessage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	configuration := p.getConfiguration()
+	if !configuration.voiceMessagesEnabled() {
+		http.Error(w, "Voice messages are disabled", http.StatusForbidden)
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxVoiceMessageBytes+multipartOverheadBytes)
-	req, handlerErr := parseVoiceMessageRequest(r, maxVoiceMessageBytes)
+	req, handlerErr := parseVoiceMessageRequest(r, maxVoiceMessageBytes, configuration.clientTranscriptionEnabled())
 	if handlerErr != nil {
 		http.Error(w, handlerErr.message, handlerErr.status)
 		return
@@ -100,7 +107,7 @@ func (p *Plugin) handleCreateVoiceMessage(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func parseVoiceMessageRequest(r *http.Request, maxBytes int64) (parsed voiceMessageRequest, handlerErr *handlerError) {
+func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript bool) (parsed voiceMessageRequest, handlerErr *handlerError) {
 	if err := r.ParseMultipartForm(multipartOverheadBytes); err != nil {
 		if strings.Contains(err.Error(), "http: request body too large") {
 			return voiceMessageRequest{}, &handlerError{message: "Voice message too large", status: http.StatusRequestEntityTooLarge}
@@ -130,6 +137,11 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64) (parsed voiceMess
 	waveform, handlerErr := parseVoiceWaveform(r.FormValue("waveform"))
 	if handlerErr != nil {
 		return voiceMessageRequest{}, handlerErr
+	}
+
+	transcript := ""
+	if allowTranscript {
+		transcript = normalizeVoiceTranscript(r.FormValue("transcript"))
 	}
 
 	file, header, err := r.FormFile("audio")
@@ -166,7 +178,30 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64) (parsed voiceMess
 		mimeType:   mimeType,
 		waveform:   waveform,
 		data:       data,
+		transcript: transcript,
 	}, nil
+}
+
+func normalizeVoiceTranscript(value string) string {
+	normalized := strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(value, "\r\n", "\n"), "\r", "\n"))
+	if normalized == "" {
+		return ""
+	}
+
+	limit := model.PostMessageMaxRunesV2 - 1
+	runeCount := 0
+	cutoff := len(normalized)
+	for index := range normalized {
+		if runeCount == limit {
+			cutoff = index
+		}
+		runeCount++
+		if runeCount > model.PostMessageMaxRunesV2 {
+			return normalized[:cutoff] + "…"
+		}
+	}
+
+	return normalized
 }
 
 func parseVoiceWaveform(value string) ([]any, *handlerError) {
@@ -251,7 +286,7 @@ func buildVoiceMessagePost(userID string, req voiceMessageRequest, fileInfo *mod
 		UserId:    userID,
 		ChannelId: req.channelID,
 		RootId:    req.rootID,
-		Message:   "",
+		Message:   req.transcript,
 		FileIds:   []string{fileInfo.Id},
 		Props: model.StringInterface{
 			"voice_message": buildVoiceMessageProps(fileInfo, req.mimeType, req.durationMS, int64(len(req.data)), req.waveform),
