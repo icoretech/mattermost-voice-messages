@@ -7,13 +7,13 @@
 [![GitHub Release](https://img.shields.io/github/v/release/icoretech/mattermost-voice-messages)](https://github.com/icoretech/mattermost-voice-messages/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<p align="center">
-  <img src=".github/assets/screenshot.png" alt="Mattermost Voice Messages screenshot" width="838" />
-</p>
-
 The plugin adds a microphone button to Mattermost web and desktop. Users can record a short audio message, listen to it before sending, and post it in a channel or thread.
 
 People reading from Mattermost web, desktop, or a mobile browser get the full voice-message player with waveform and speed controls. People reading from the native Mattermost iOS or Android apps get a regular audio attachment they can play with the mobile app's built-in audio player.
+
+<p align="center">
+  <img src=".github/assets/screenshot.png" alt="Mattermost Voice Messages screenshot" width="838" />
+</p>
 
 ## Features
 
