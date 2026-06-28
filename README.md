@@ -1,5 +1,7 @@
 # Mattermost Voice Messages
 
+**WhatsApp-style voice messages for Mattermost channels and threads**
+
 [![CI](https://github.com/icoretech/mattermost-voice-messages/actions/workflows/ci.yml/badge.svg)](https://github.com/icoretech/mattermost-voice-messages/actions/workflows/ci.yml)
 [![Release](https://github.com/icoretech/mattermost-voice-messages/actions/workflows/release.yml/badge.svg)](https://github.com/icoretech/mattermost-voice-messages/actions/workflows/release.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/icoretech/mattermost-voice-messages)](https://github.com/icoretech/mattermost-voice-messages/releases/latest)
@@ -8,8 +10,6 @@
 <p align="center">
   <img src=".github/assets/screenshot.png" alt="Mattermost Voice Messages screenshot" width="838" />
 </p>
-
-WhatsApp-style voice messages for Mattermost channels and threads.
 
 The plugin adds a microphone button to Mattermost web and desktop. Users can record a short audio message, listen to it before sending, and post it in a channel or thread.
 
