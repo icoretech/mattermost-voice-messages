@@ -1,6 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import type { Post } from "@mattermost/types/posts";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import React from "react";
 import { VoicePostComponent } from "./voice_post";
 
@@ -284,5 +290,44 @@ describe("VoicePostComponent", () => {
     expect(
       screen.getByRole("link", { name: "Open audio file" }),
     ).toHaveAttribute("href", "#");
+  });
+  it("resets audio state on source changes while preserving speed and ignoring stale play completion", async () => {
+    const pendingPlay = Promise.withResolvers<void>();
+    HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockReturnValueOnce(pendingPlay.promise)
+      .mockResolvedValue(undefined);
+    const { rerender } = render(
+      <VoicePostComponent
+        post={makePost({
+          file_ids: ["first-file"],
+          props: { voice_message: { duration_ms: 2000 } },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "2x" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play voice message" }));
+    const originalAudio = getCreatedAudio();
+    originalAudio.currentTime = 1;
+    fireEvent.timeUpdate(originalAudio);
+    expect(screen.getByText("0:01 / 0:02")).toBeInTheDocument();
+    rerender(
+      <VoicePostComponent
+        post={makePost({
+          file_ids: ["second-file"],
+          props: { voice_message: { duration_ms: 2000 } },
+        })}
+      />,
+    );
+    expect(getCreatedAudio()).not.toBe(originalAudio);
+    expect(screen.getByText("0:00 / 0:02")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2x" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await act(async () => pendingPlay.resolve());
+    fireEvent.click(screen.getByRole("button", { name: "Play voice message" }));
+    await screen.findByRole("button", { name: "Pause voice message" });
+    expect(getCreatedAudio().playbackRate).toBe(2);
   });
 });

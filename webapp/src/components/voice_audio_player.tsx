@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer, useRef } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import {
   getRenderableWaveformPeaks,
   peakToBarHeightPercent,
@@ -23,35 +23,26 @@ type PlayerState = {
   metadataDurationMs: number;
   elapsedMs: number;
   playing: boolean;
-  speed: PlaybackSpeed;
   audioError: boolean;
 };
 
 type PlayerAction =
-  | { type: "source-changed" }
   | { type: "metadata-loaded"; durationMs: number }
   | { type: "time-updated"; elapsedMs: number }
   | { type: "playing" }
   | { type: "paused" }
   | { type: "ended"; durationMs: number }
-  | { type: "speed-changed"; speed: PlaybackSpeed }
   | { type: "audio-error" };
 
 const initialPlayerState: PlayerState = {
   metadataDurationMs: 0,
   elapsedMs: 0,
   playing: false,
-  speed: 1,
   audioError: false,
 };
 
 function playerReducer(state: PlayerState, action: PlayerAction): PlayerState {
   switch (action.type) {
-    case "source-changed":
-      return {
-        ...initialPlayerState,
-        speed: state.speed,
-      };
     case "metadata-loaded":
       return {
         ...state,
@@ -77,11 +68,6 @@ function playerReducer(state: PlayerState, action: PlayerAction): PlayerState {
         ...state,
         playing: false,
         elapsedMs: action.durationMs,
-      };
-    case "speed-changed":
-      return {
-        ...state,
-        speed: action.speed,
       };
     case "audio-error":
       return {
@@ -117,34 +103,55 @@ function getAudioDurationMs(
     : fallbackDurationMs;
 }
 
-export function VoiceAudioPlayer({
-  src,
-  durationMs = 0,
-  fallbackHref,
-  compact = false,
-  waveform,
-  variant = "post",
-}: VoiceAudioPlayerProps) {
+export function VoiceAudioPlayer(props: VoiceAudioPlayerProps) {
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
+  return (
+    <VoiceAudioPlayerSession
+      key={JSON.stringify([props.src, props.durationMs ?? 0])}
+      {...props}
+      speed={speed}
+      onSpeedChange={setSpeed}
+    />
+  );
+}
+
+function VoicePlaybackButton({
+  playing,
+  onPause,
+  onPlay,
+}: {
+  playing: boolean;
+  onPause: () => void;
+  onPlay: () => void;
+}) {
+  return (
+    <button
+      className="VoiceMessagePost__playButton"
+      type="button"
+      aria-label={playing ? "Pause voice message" : "Play voice message"}
+      onClick={() => (playing ? onPause() : void onPlay())}
+    >
+      <span
+        aria-hidden="true"
+        className={
+          playing ? "VoiceMessagePost__pauseIcon" : "VoiceMessagePost__playIcon"
+        }
+      />
+    </button>
+  );
+}
+
+function useVoiceAudioPlayback(
+  src: string,
+  durationMs: number,
+  speed: PlaybackSpeed,
+  onSpeedChange: (speed: PlaybackSpeed) => void,
+) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
   const resolvedDurationMs = durationMs || state.metadataDurationMs;
   const durationForProgress = resolvedDurationMs > 0 ? resolvedDurationMs : 0;
-  const progressPercent = durationForProgress
-    ? Math.min(100, Math.max(0, (state.elapsedMs / durationForProgress) * 100))
-    : 0;
-  const activeWaveformBars = Math.round(
-    (progressPercent / 100) * waveformBars.length,
-  );
-  const waveformPeaks = getRenderableWaveformPeaks(waveform);
-  const waveformBarsWithIds = waveformPeaks.map((peak, index) => ({
-    active: index < activeWaveformBars,
-    id: `waveform-bar-${index}`,
-    peak,
-  }));
-
   useEffect(() => {
-    dispatch({ type: "source-changed" });
-
     if (!src) {
       audioRef.current = null;
       return undefined;
@@ -181,7 +188,6 @@ export function VoiceAudioPlayer({
     audio.addEventListener("error", handleError);
 
     return () => {
-      audio.pause();
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
@@ -190,6 +196,7 @@ export function VoiceAudioPlayer({
       if (audioRef.current === audio) {
         audioRef.current = null;
       }
+      audio.pause();
     };
   }, [src, durationMs]);
 
@@ -200,12 +207,12 @@ export function VoiceAudioPlayer({
       return;
     }
 
-    audio.playbackRate = state.speed;
+    audio.playbackRate = speed;
     try {
       await audio.play();
-      dispatch({ type: "playing" });
+      if (audioRef.current === audio) dispatch({ type: "playing" });
     } catch {
-      dispatch({ type: "audio-error" });
+      if (audioRef.current === audio) dispatch({ type: "audio-error" });
     }
   }
 
@@ -215,7 +222,7 @@ export function VoiceAudioPlayer({
   }
 
   function updateSpeed(nextSpeed: PlaybackSpeed) {
-    dispatch({ type: "speed-changed", speed: nextSpeed });
+    onSpeedChange(nextSpeed);
     if (audioRef.current) {
       audioRef.current.playbackRate = nextSpeed;
     }
@@ -231,6 +238,52 @@ export function VoiceAudioPlayer({
     audio.currentTime = nextElapsedMs / 1000;
     dispatch({ type: "time-updated", elapsedMs: nextElapsedMs });
   }
+
+  return {
+    state,
+    resolvedDurationMs,
+    durationForProgress,
+    playVoiceMessage,
+    pauseVoiceMessage,
+    updateSpeed,
+    seekToPercent,
+  };
+}
+
+function VoiceAudioPlayerSession({
+  src,
+  durationMs = 0,
+  fallbackHref,
+  compact = false,
+  waveform,
+  variant = "post",
+  speed,
+  onSpeedChange,
+}: VoiceAudioPlayerProps & {
+  speed: PlaybackSpeed;
+  onSpeedChange: (speed: PlaybackSpeed) => void;
+}) {
+  const {
+    state,
+    resolvedDurationMs,
+    durationForProgress,
+    playVoiceMessage,
+    pauseVoiceMessage,
+    updateSpeed,
+    seekToPercent,
+  } = useVoiceAudioPlayback(src, durationMs, speed, onSpeedChange);
+  const progressPercent = durationForProgress
+    ? Math.min(100, Math.max(0, (state.elapsedMs / durationForProgress) * 100))
+    : 0;
+  const activeWaveformBars = Math.round(
+    (progressPercent / 100) * waveformBars.length,
+  );
+  const waveformPeaks = getRenderableWaveformPeaks(waveform);
+  const waveformBarsWithIds = waveformPeaks.map((peak, index) => ({
+    active: index < activeWaveformBars,
+    id: `waveform-bar-${index}`,
+    peak,
+  }));
 
   if (!src || state.audioError) {
     return (
@@ -256,25 +309,11 @@ export function VoiceAudioPlayer({
           .filter(Boolean)
           .join(" ")}
       >
-        <button
-          className="VoiceMessagePost__playButton"
-          type="button"
-          aria-label={
-            state.playing ? "Pause voice message" : "Play voice message"
-          }
-          onClick={() =>
-            state.playing ? pauseVoiceMessage() : void playVoiceMessage()
-          }
-        >
-          <span
-            aria-hidden="true"
-            className={
-              state.playing
-                ? "VoiceMessagePost__pauseIcon"
-                : "VoiceMessagePost__playIcon"
-            }
-          />
-        </button>
+        <VoicePlaybackButton
+          playing={state.playing}
+          onPause={pauseVoiceMessage}
+          onPlay={playVoiceMessage}
+        />
         <span className="VoiceMessagePost__timeline">
           {formatPlaybackTime(resolvedDurationMs)}
         </span>
@@ -291,25 +330,11 @@ export function VoiceAudioPlayer({
         .filter(Boolean)
         .join(" ")}
     >
-      <button
-        className="VoiceMessagePost__playButton"
-        type="button"
-        aria-label={
-          state.playing ? "Pause voice message" : "Play voice message"
-        }
-        onClick={() =>
-          state.playing ? pauseVoiceMessage() : void playVoiceMessage()
-        }
-      >
-        <span
-          aria-hidden="true"
-          className={
-            state.playing
-              ? "VoiceMessagePost__pauseIcon"
-              : "VoiceMessagePost__playIcon"
-          }
-        />
-      </button>
+      <VoicePlaybackButton
+        playing={state.playing}
+        onPause={pauseVoiceMessage}
+        onPlay={playVoiceMessage}
+      />
 
       <div className="VoiceMessagePost__body">
         <label className="VoiceMessagePost__scrubberLabel">
@@ -352,7 +377,7 @@ export function VoiceAudioPlayer({
               <button
                 className="VoiceMessagePost__speedButton"
                 type="button"
-                aria-pressed={state.speed === playbackSpeed}
+                aria-pressed={speed === playbackSpeed}
                 key={playbackSpeed}
                 onClick={() => updateSpeed(playbackSpeed)}
               >

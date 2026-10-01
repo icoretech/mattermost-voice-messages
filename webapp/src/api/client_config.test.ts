@@ -1,4 +1,9 @@
-import { defaultClientConfig, loadClientConfig } from "./client_config";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import {
+  defaultClientConfig,
+  loadClientConfig,
+  useVoiceMessagesClientConfig,
+} from "./client_config";
 
 describe("client config", () => {
   beforeEach(() => {
@@ -6,6 +11,7 @@ describe("client config", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -88,5 +94,53 @@ describe("client config", () => {
     await expect(loadClientConfig()).resolves.toMatchObject({
       voiceMessagesEnabled: true,
     });
+  });
+  it("loads configuration into the hook and clears loading state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ voice_messages_enabled: false })),
+    );
+    const { result } = renderHook(() => useVoiceMessagesClientConfig());
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.config.voiceMessagesEnabled).toBe(false);
+    expect(result.current.error).toBe("");
+  });
+
+  it("aborts configuration requests when the hook unmounts", async () => {
+    const response = Promise.withResolvers<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => response.promise),
+    );
+    const { result, unmount } = renderHook(() =>
+      useVoiceMessagesClientConfig(),
+    );
+    const signal = vi.mocked(fetch).mock.calls[0][1]?.signal;
+    expect(signal?.aborted).toBe(false);
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    await act(async () =>
+      response.resolve(Response.json({ voice_messages_enabled: false })),
+    );
+    expect(result.current.loading).toBe(true);
+    expect(result.current.config).toBe(defaultClientConfig);
+  });
+
+  it("leaves loading state and preserves defaults when configuration fails", async () => {
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () => new Response("configuration unavailable", { status: 503 }),
+      ),
+    );
+    const { result } = renderHook(() => useVoiceMessagesClientConfig());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.config).toBe(defaultClientConfig);
+    expect(result.current.error).toBe("configuration unavailable");
+    expect(warning).toHaveBeenCalledTimes(1);
   });
 });
