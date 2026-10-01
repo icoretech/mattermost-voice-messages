@@ -44,11 +44,26 @@ jobs:
           node-version: 24.21.0
           cache: npm
           cache-dependency-path: webapp/package-lock.json
-      - run: cd webapp && npm ci
-      - run: make dist
+      - name: Load public signing key from the publication revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/contents/assets/signing-key.asc?ref=$GITHUB_SHA" > assets/signing-key.asc
 
       - name: Import GPG key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+      - name: Verify signing key
+        run: |
+          SIGNING_KEY_FINGERPRINT=$(gpg --show-keys --with-colons assets/signing-key.asc | awk -F: '$1 == "fpr" {print $10; exit}')
+          test -n "$SIGNING_KEY_FINGERPRINT"
+          gpg --batch --list-secret-keys "$SIGNING_KEY_FINGERPRINT" > /dev/null
+          echo "SIGNING_KEY_FINGERPRINT=$SIGNING_KEY_FINGERPRINT" >> "$GITHUB_ENV"
+
+      - run: cd webapp && npm ci
+      - run: make dist
 
       - name: Sign plugin bundle
         env:
@@ -57,6 +72,7 @@ jobs:
           for f in dist/*.tar.gz; do
             gpg --batch --yes \
                 --pinentry-mode loopback \
+                --local-user "$SIGNING_KEY_FINGERPRINT" \
                 --passphrase "$GPG_PASSPHRASE" \
                 --personal-digest-preferences SHA256 \
                 --detach-sign "$f"
