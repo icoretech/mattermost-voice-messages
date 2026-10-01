@@ -1,9 +1,9 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
-import pluginManifest from "../plugin.json";
 import { defineConfig } from "vite";
 import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
+import pluginManifest from "../plugin.json" with { type: "json" };
 
 const configDir = dirname(fileURLToPath(import.meta.url));
 const pluginId = pluginManifest.id;

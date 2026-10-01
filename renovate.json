@@ -1,9 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "enabledManagers": ["github-actions", "npm", "gomod", "custom.regex"],
+  "extends": [
+    "config:recommended"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "npm",
+    "gomod",
+    "custom.regex"
+  ],
   "dependencyDashboard": true,
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "platformAutomerge": false,
   "prHourlyLimit": 0,
   "prConcurrentLimit": 10,
@@ -13,7 +22,9 @@
   "packageRules": [
     {
       "description": "Group Vite ecosystem updates",
-      "matchManagers": ["npm"],
+      "matchManagers": [
+        "npm"
+      ],
       "matchPackageNames": [
         "/^vite$/",
         "/^@vitejs\\//",
@@ -25,7 +36,10 @@
     },
     {
       "description": "Group Biome and TypeScript tooling",
-      "matchManagers": ["npm", "custom.regex"],
+      "matchManagers": [
+        "npm",
+        "custom.regex"
+      ],
       "matchPackageNames": [
         "/^@biomejs\\//",
         "/^typescript$/"
@@ -35,7 +49,9 @@
     },
     {
       "description": "Group React ecosystem updates",
-      "matchManagers": ["npm"],
+      "matchManagers": [
+        "npm"
+      ],
       "matchPackageNames": [
         "/^react$/",
         "/^react-dom$/",
@@ -48,7 +64,9 @@
     },
     {
       "description": "Group Mattermost SDK updates",
-      "matchManagers": ["npm"],
+      "matchManagers": [
+        "npm"
+      ],
       "matchPackageNames": [
         "/^@mattermost\\//",
         "/^mattermost-/"
@@ -58,7 +76,9 @@
     },
     {
       "description": "Group Go Mattermost dependencies",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^github\\.com\\/mattermost\\//",
         "/^github\\.com\\/gorilla\\//",
@@ -69,7 +89,9 @@
     },
     {
       "description": "Group Go standard library updates",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "/^golang\\.org\\//",
         "/^google\\.golang\\.org\\//",
@@ -81,18 +103,43 @@
     },
     {
       "description": "Automerge non-major updates after checks pass",
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Keep TypeScript within the Mattermost SDK peer range and React Doctor JavaScript API support",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "allowedVersions": "<6.0.0"
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/(^|/)biome\\.json$/"],
-      "matchStrings": ["https://biomejs.dev/schemas/(?<currentValue>[^/]+)/schema.json"],
+      "managerFilePatterns": [
+        "/(^|/)biome\\.json$/"
+      ],
+      "matchStrings": [
+        "https://biomejs.dev/schemas/(?<currentValue>[^/]+)/schema.json"
+      ],
       "depNameTemplate": "@biomejs/biome",
       "datasourceTemplate": "npm"
     }
-  ]
+  ],
+  "ignorePresets": [
+    ":semanticPrefixFixDepsChoreOthers"
+  ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "deps",
+  "semanticCommitScope": ""
 }

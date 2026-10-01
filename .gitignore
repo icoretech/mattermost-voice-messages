@@ -39,3 +39,5 @@ AGENTS.md
 !.agents/skill/mattermost-voice-dev-smoke/
 !.agents/skill/mattermost-voice-dev-smoke/**
 .sisyphus/
+.omo/
+__pycache__/

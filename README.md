@@ -108,7 +108,7 @@ cd webapp
 npm ci
 ```
 
-Development builds require Go 1.26+ and Node.js 24+.
+Development builds require Go 1.27.1+ and Node.js 24+. CI uses Node.js 24.21.0.
 
 Build the plugin bundle:
 
