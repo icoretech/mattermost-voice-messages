@@ -12,7 +12,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.0",
+    "@biomejs/biome": "2.5.15",
     "@mattermost/types": "11.7.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
