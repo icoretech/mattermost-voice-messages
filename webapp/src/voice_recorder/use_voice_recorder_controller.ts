@@ -73,7 +73,20 @@ function useRecordingLifecycle(status: RecorderStatus) {
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef(0);
   const stoppedDurationMsRef = useRef<number | null>(null);
+  const sessionRef = useRef<AbortController | null>(null);
   const recordingSupported = isRecordingSupported();
+
+  const abortSession = useCallback(() => {
+    sessionRef.current?.abort();
+    sessionRef.current = null;
+  }, []);
+
+  const beginSession = useCallback(() => {
+    abortSession();
+    const controller = new AbortController();
+    sessionRef.current = controller;
+    return controller.signal;
+  }, [abortSession]);
 
   const stopStream = useCallback(() => {
     for (const track of streamRef.current?.getTracks() ?? []) {
@@ -110,8 +123,18 @@ function useRecordingLifecycle(status: RecorderStatus) {
   }, [status]);
 
   useEffect(() => {
-    return () => stopStream();
-  }, [stopStream]);
+    return () => {
+      abortSession();
+      const recorder = recorderRef.current;
+      if (recorder) {
+        recorder.onstop = null;
+        recorder.ondataavailable = null;
+        recorder.onerror = null;
+        if (recorder.state !== "inactive") recorder.stop();
+      }
+      stopStream();
+    };
+  }, [abortSession, stopStream]);
 
   const setStream = useCallback((stream: MediaStream) => {
     streamRef.current = stream;
@@ -165,6 +188,8 @@ function useRecordingLifecycle(status: RecorderStatus) {
     markStarted,
     captureStoppedDuration,
     getStoppedDurationMs,
+    beginSession,
+    abortSession,
   };
 }
 
@@ -175,7 +200,6 @@ function useTranscriptionLifecycle() {
   const [transcriptionError, setTranscriptionError] = useState("");
   const [transcriptionProgressLabel, setTranscriptionProgressLabel] =
     useState("");
-  const autoStartedReviewRef = useRef<number | null>(null);
   const transcriptionAbortControllerRef = useRef<AbortController | null>(null);
 
   const abortActiveTranscription = useCallback(() => {
@@ -185,7 +209,6 @@ function useTranscriptionLifecycle() {
 
   const resetTranscriptionState = useCallback(() => {
     abortActiveTranscription();
-    autoStartedReviewRef.current = null;
     setTranscript("");
     setTranscriptionStatus("idle");
     setTranscriptionError("");
@@ -234,15 +257,6 @@ function useTranscriptionLifecycle() {
     setTranscriptionProgressLabel("");
   }, [abortActiveTranscription]);
 
-  const hasAutoStartedReview = useCallback(
-    (reviewId: number) => autoStartedReviewRef.current === reviewId,
-    [],
-  );
-
-  const markAutoStartedReview = useCallback((reviewId: number) => {
-    autoStartedReviewRef.current = reviewId;
-  }, []);
-
   return {
     transcript,
     setTranscript,
@@ -257,8 +271,6 @@ function useTranscriptionLifecycle() {
     completeTranscription,
     failTranscription,
     cancelTranscription,
-    hasAutoStartedReview,
-    markAutoStartedReview,
   };
 }
 
@@ -269,8 +281,8 @@ export function useVoiceRecorderController(
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [error, setError] = useState("");
   const [review, setReview] = useState<ReviewRecording | null>(null);
-  const [uploadAbortController, setUploadAbortController] =
-    useState<AbortController | null>(null);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
+  const reviewURLRef = useRef<string | null>(null);
   const reviewSequenceRef = useRef(0);
 
   const {
@@ -288,6 +300,8 @@ export function useVoiceRecorderController(
     markStarted,
     captureStoppedDuration,
     getStoppedDurationMs,
+    beginSession,
+    abortSession,
   } = useRecordingLifecycle(status);
 
   const {
@@ -304,34 +318,31 @@ export function useVoiceRecorderController(
     completeTranscription,
     failTranscription,
     cancelTranscription,
-    hasAutoStartedReview,
-    markAutoStartedReview,
   } = useTranscriptionLifecycle();
+
+  const releaseReviewURL = useCallback(() => {
+    if (reviewURLRef.current) URL.revokeObjectURL(reviewURLRef.current);
+    reviewURLRef.current = null;
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (review?.url) {
-        URL.revokeObjectURL(review.url);
-      }
+      releaseReviewURL();
+      uploadAbortControllerRef.current?.abort();
     };
-  }, [review?.url]);
-
-  useEffect(() => {
-    if (!uploadAbortController) {
-      return undefined;
-    }
-
-    return () => uploadAbortController.abort();
-  }, [uploadAbortController]);
+  }, [releaseReviewURL]);
 
   function clearReview() {
+    releaseReviewURL();
     setReview(null);
   }
 
   async function finishRecording(
     recorder: MediaRecorder,
-    selectedMimeType?: string,
+    selectedMimeType: string | undefined,
+    signal: AbortSignal,
   ) {
+    if (signal.aborted) return;
     const durationMs = getStoppedDurationMs() ?? getElapsedRecordingMs();
     const mimeType = recorder.mimeType || selectedMimeType || "audio/webm";
     const blob = createBlob(mimeType);
@@ -350,17 +361,27 @@ export function useVoiceRecorderController(
     const waveform =
       (await extractWaveformPeaksFromBlob(blob)) ??
       getRenderableWaveformPeaks(undefined);
+    if (signal.aborted) return;
     const reviewId = reviewSequenceRef.current + 1;
     reviewSequenceRef.current = reviewId;
-    setReview({
+    const nextReview = {
       id: reviewId,
       blob,
       durationMs,
       mimeType,
       waveform,
       url: URL.createObjectURL(blob),
-    });
+    };
+    releaseReviewURL();
+    reviewURLRef.current = nextReview.url;
+    setReview(nextReview);
     setStatus("review");
+    if (
+      config.clientTranscriptionEnabled &&
+      config.clientTranscriptionAutoStart
+    ) {
+      void startTranscription(nextReview);
+    }
   }
 
   async function startRecording() {
@@ -380,11 +401,13 @@ export function useVoiceRecorderController(
     resetTranscriptionState();
     clearReview();
     setStatus("requesting-permission");
+    const signal = beginSession();
 
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (recordingError) {
+      if (signal.aborted) return;
       setError(
         recordingError instanceof Error
           ? recordingError.message
@@ -394,6 +417,10 @@ export function useVoiceRecorderController(
       return;
     }
 
+    if (signal.aborted) {
+      for (const track of stream.getTracks()) track.stop();
+      return;
+    }
     setStream(stream);
     const selectedMimeType = selectAudioMimeType();
     let recorder: MediaRecorder;
@@ -415,22 +442,41 @@ export function useVoiceRecorderController(
 
     resetChunks();
     recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
+      if (!signal.aborted && event.data.size > 0) {
         appendChunk(event.data);
       }
     };
     recorder.onerror = () => {
+      if (signal.aborted) return;
+      abortSession();
       stopStream();
       resetRecorder();
       resetTranscriptionState();
       setError("Could not record voice message");
       setStatus("error");
     };
-    recorder.onstop = () => void finishRecording(recorder, selectedMimeType);
+    recorder.onstop = () =>
+      void finishRecording(recorder, selectedMimeType, signal);
 
     setRecorder(recorder);
     markStarted();
-    recorder.start();
+    try {
+      recorder.start();
+    } catch (recordingError) {
+      abortSession();
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      recorder.onerror = null;
+      stopStream();
+      resetRecorder();
+      setError(
+        recordingError instanceof Error
+          ? recordingError.message
+          : "Could not start recording",
+      );
+      setStatus("error");
+      return;
+    }
     setStatus("recording");
   }
 
@@ -453,14 +499,17 @@ export function useVoiceRecorderController(
   }
 
   function cancelRecording() {
+    abortSession();
     const recorder = getRecorder();
-    if (recorder?.state === "recording") {
+    if (recorder) {
       recorder.onstop = null;
-      recorder.stop();
+      recorder.ondataavailable = null;
+      recorder.onerror = null;
+      if (recorder.state !== "inactive") recorder.stop();
     }
 
-    uploadAbortController?.abort();
-    setUploadAbortController(null);
+    uploadAbortControllerRef.current?.abort();
+    uploadAbortControllerRef.current = null;
     stopStream();
     resetRecorder();
     clearReview();
@@ -541,29 +590,8 @@ export function useVoiceRecorderController(
     ],
   );
 
-  useEffect(() => {
-    if (
-      !config.clientTranscriptionEnabled ||
-      !config.clientTranscriptionAutoStart ||
-      !review ||
-      hasAutoStartedReview(review.id)
-    ) {
-      return;
-    }
-
-    markAutoStartedReview(review.id);
-    void startTranscription(review);
-  }, [
-    config.clientTranscriptionAutoStart,
-    config.clientTranscriptionEnabled,
-    hasAutoStartedReview,
-    markAutoStartedReview,
-    review,
-    startTranscription,
-  ]);
-
   async function sendRecording() {
-    if (!review) {
+    if (!review || uploadAbortControllerRef.current) {
       return;
     }
 
@@ -590,7 +618,7 @@ export function useVoiceRecorderController(
 
     abortActiveTranscription();
     const abortController = new AbortController();
-    setUploadAbortController(abortController);
+    uploadAbortControllerRef.current = abortController;
     setStatus("uploading");
     setError("");
 
@@ -605,6 +633,7 @@ export function useVoiceRecorderController(
         transcript: config.clientTranscriptionEnabled ? transcript : undefined,
         signal: abortController.signal,
       });
+      if (abortController.signal.aborted) return;
       clearReview();
       resetTranscriptionState();
       setStatus("idle");
@@ -619,9 +648,9 @@ export function useVoiceRecorderController(
       );
       setStatus("error");
     } finally {
-      setUploadAbortController((current) =>
-        current === abortController ? null : current,
-      );
+      if (uploadAbortControllerRef.current === abortController) {
+        uploadAbortControllerRef.current = null;
+      }
     }
   }
 

@@ -258,6 +258,15 @@ function IdleMicButton({
 }
 
 export function VoiceRecorderAction({ draft }: VoiceRecorderActionProps) {
+  return (
+    <VoiceRecorderSession
+      key={`${draft.channelId}:${draft.rootId ?? ""}`}
+      draft={draft}
+    />
+  );
+}
+
+function VoiceRecorderSession({ draft }: VoiceRecorderActionProps) {
   const anchorRef = useRef<HTMLSpanElement | null>(null);
   const { config, loading } = useVoiceMessagesClientConfig();
   const controller = useVoiceRecorderController(draft, config);
