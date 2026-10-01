@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.4...v0.2.0) (2026-10-01)
+
+
+### Bug Fixes
+
+* **player:** reset audio sessions and ignore stale playback completion ([c9a8af2](https://github.com/icoretech/mattermost-voice-messages/commit/c9a8af26368ca9a7a36250dffd85197c2643bb94))
+* **recorder:** cancel pending audio work when recordings or drafts change ([43a2837](https://github.com/icoretech/mattermost-voice-messages/commit/43a28373c395b0a3e5464d7186be116beb1407ea))
+* **uploads:** remove temporary audio files and reject archived channels ([dcccff6](https://github.com/icoretech/mattermost-voice-messages/commit/dcccff64936b0fd72f15be8afdecf9d4c6ae1c34))
+
+
+### Dependencies
+
+* update frontend packages, Go modules and CI actions ([669e734](https://github.com/icoretech/mattermost-voice-messages/commit/669e734f53bae9fed326b951ff93dfb8f20d75b1))
+
+
+### Miscellaneous Chores
+
+* release 0.2.0 ([d9e758b](https://github.com/icoretech/mattermost-voice-messages/commit/d9e758be4e3b115e245521991f21dad8d73d1755))
+
 ## [0.1.4](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.3...v0.1.4) (2026-06-21)
 
 
