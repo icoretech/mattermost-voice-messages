@@ -78,6 +78,16 @@ func (p *Plugin) handleCreateVoiceMessage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	channel, appErr := p.API.GetChannel(req.channelID)
+	if appErr != nil {
+		writeAppError(w, appErr, "Could not get channel")
+		return
+	}
+	if channel == nil || channel.DeleteAt != 0 {
+		http.Error(w, "Channel is unavailable or archived", http.StatusForbidden)
+		return
+	}
+
 	if req.rootID != "" {
 		rootPost, appErr := p.API.GetPost(req.rootID)
 		if appErr != nil || rootPost == nil || rootPost.ChannelId != req.channelID {
@@ -114,6 +124,14 @@ func (p *Plugin) handleCreateVoiceMessage(w http.ResponseWriter, r *http.Request
 }
 
 func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript bool) (parsed voiceMessageRequest, handlerErr *handlerError) {
+	defer func() {
+		if r.MultipartForm != nil {
+			if err := r.MultipartForm.RemoveAll(); err != nil && handlerErr == nil {
+				parsed = voiceMessageRequest{}
+				handlerErr = &handlerError{message: "Could not clean up voice message upload", status: http.StatusInternalServerError}
+			}
+		}
+	}()
 	if err := r.ParseMultipartForm(multipartOverheadBytes); err != nil {
 		if strings.Contains(err.Error(), "http: request body too large") {
 			return voiceMessageRequest{}, &handlerError{message: "Voice message too large", status: http.StatusRequestEntityTooLarge}

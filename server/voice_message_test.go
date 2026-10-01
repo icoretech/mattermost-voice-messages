@@ -218,6 +218,72 @@ func TestParseVoiceMessageRequestRejectsInvalidMultipart(t *testing.T) {
 	}
 }
 
+func TestParseVoiceMessageRequestRemovesTemporaryFiles(t *testing.T) {
+	for _, scenario := range []string{"valid", "invalid fields", "invalid audio", "invalid query"} {
+		t.Run(scenario, func(t *testing.T) {
+			tempDir := t.TempDir()
+			t.Setenv("TMPDIR", tempDir)
+			fields := map[string]string{"channel_id": model.NewId()}
+			audio := append(validWebMAudioBytes(), make([]byte, 2*multipartOverheadBytes)...)
+			if scenario == "invalid fields" {
+				fields["duration_ms"] = "-1"
+			}
+			if scenario == "invalid audio" {
+				audio = bytes.Repeat([]byte("invalid"), 2*multipartOverheadBytes)
+			}
+			req := newVoiceMultipartRequest(t, fields, "voice.webm", "audio/webm", audio)
+			if scenario == "invalid query" {
+				req.URL.RawQuery = "invalid=%zz"
+			}
+			parsed, handlerErr := parseVoiceMessageRequest(req, maxVoiceMessageBytes, false)
+			if scenario == "valid" {
+				require.Nil(t, handlerErr)
+				require.Equal(t, audio, parsed.data)
+			} else {
+				require.NotNil(t, handlerErr)
+			}
+			entries, err := os.ReadDir(tempDir)
+			require.NoError(t, err)
+			require.Empty(t, entries, "multipart uploads must not remain on disk")
+		})
+	}
+}
+
+func TestHandleCreateVoiceMessageRejectsUnavailableChannels(t *testing.T) {
+	for _, scenario := range []string{"archived", "missing", "fetch error"} {
+		t.Run(scenario, func(t *testing.T) {
+			api := &plugintest.API{}
+			p := &Plugin{}
+			p.SetAPI(api)
+			p.router = p.initRouter()
+			userID, channelID := model.NewId(), model.NewId()
+			api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
+			api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
+			api.On("HasPermissionToChannel", userID, channelID, model.PermissionUploadFile).Return(true)
+			switch scenario {
+			case "archived":
+				api.On("GetChannel", channelID).Return(&model.Channel{Id: channelID, DeleteAt: 1}, (*model.AppError)(nil))
+			case "missing":
+				api.On("GetChannel", channelID).Return((*model.Channel)(nil), (*model.AppError)(nil))
+			case "fetch error":
+				api.On("GetChannel", channelID).Return((*model.Channel)(nil), model.NewAppError("GetChannel", "channel.not_found", nil, "", http.StatusNotFound))
+			}
+			req := newVoiceMultipartRequest(t, map[string]string{"channel_id": channelID}, "voice.webm", "audio/webm", validWebMAudioBytes())
+			req.Header.Set("Mattermost-User-ID", userID)
+			rec := httptest.NewRecorder()
+			p.ServeHTTP(nil, rec, req)
+			if scenario == "fetch error" {
+				assert.Equal(t, http.StatusNotFound, rec.Code)
+			} else {
+				assert.Equal(t, http.StatusForbidden, rec.Code)
+			}
+			api.AssertNotCalled(t, "UploadFile", mock.Anything, mock.Anything, mock.Anything)
+			api.AssertNotCalled(t, "CreatePost", mock.Anything)
+			api.AssertExpectations(t)
+		})
+	}
+}
+
 func TestParseVoiceMessageRequestRejectsMalformedMultipart(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice-messages", strings.NewReader("not multipart"))
 	req.Header.Set("Content-Type", "multipart/form-data; boundary=missing")
@@ -388,6 +454,7 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionUploadFile).Return(true)
+	api.On("GetChannel", channelID).Return(&model.Channel{Id: channelID}, (*model.AppError)(nil))
 	api.On("GetPost", rootID).Return(&model.Post{Id: rootID, ChannelId: channelID}, (*model.AppError)(nil))
 	api.On(
 		"UploadFile",
@@ -441,6 +508,7 @@ func TestHandleCreateVoiceMessageStoresTranscriptWhenEnabled(t *testing.T) {
 	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionUploadFile).Return(true)
+	api.On("GetChannel", channelID).Return(&model.Channel{Id: channelID}, (*model.AppError)(nil))
 	api.On("UploadFile", mock.Anything, channelID, mock.Anything).Return(fileInfo, (*model.AppError)(nil))
 	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
 		return post.Message == "hello"
@@ -474,6 +542,7 @@ func TestHandleCreateVoiceMessageIgnoresTranscriptWhenDisabled(t *testing.T) {
 	api.On("GetChannelMember", channelID, userID).Return(&model.ChannelMember{}, (*model.AppError)(nil))
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionCreatePost).Return(true)
 	api.On("HasPermissionToChannel", userID, channelID, model.PermissionUploadFile).Return(true)
+	api.On("GetChannel", channelID).Return(&model.Channel{Id: channelID}, (*model.AppError)(nil))
 	api.On("UploadFile", mock.Anything, channelID, mock.Anything).Return(fileInfo, (*model.AppError)(nil))
 	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
 		return post.Message == ""
