@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.1](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.0...v0.2.1) (2026-10-11)
+
+
+### Dependencies
+
+* update dependency @types/node to v26.6.4 ([#18](https://github.com/icoretech/mattermost-voice-messages/issues/18)) ([f9103de](https://github.com/icoretech/mattermost-voice-messages/commit/f9103de35b989882569fa6952eb0391802996432))
+* update dependency @types/node to v26.6.5 ([#25](https://github.com/icoretech/mattermost-voice-messages/issues/25)) ([4310f42](https://github.com/icoretech/mattermost-voice-messages/commit/4310f42e89416ba35a75c19c65966a3bf161e444))
+* update dependency @vitejs/plugin-react to v6.1.2 ([#21](https://github.com/icoretech/mattermost-voice-messages/issues/21)) ([753d0d6](https://github.com/icoretech/mattermost-voice-messages/commit/753d0d631e8899856bc625937c2f6af228412791))
+* update dependency browser-whisper to v1.1.1 ([#26](https://github.com/icoretech/mattermost-voice-messages/issues/26)) ([7e36cf2](https://github.com/icoretech/mattermost-voice-messages/commit/7e36cf26e86df668bb84a63685981403cdd941d9))
+* update dependency jsdom to v30.1.2 ([#20](https://github.com/icoretech/mattermost-voice-messages/issues/20)) ([47327c6](https://github.com/icoretech/mattermost-voice-messages/commit/47327c692e63a28b6f65b52cb79eecd3c677c7bf))
+* update dependency react-doctor to v0.9.17 ([#12](https://github.com/icoretech/mattermost-voice-messages/issues/12)) ([093fe9b](https://github.com/icoretech/mattermost-voice-messages/commit/093fe9b594a1be9ea145e9e9ce00239829350045))
+* update dependency vite to v8.3.3 ([#22](https://github.com/icoretech/mattermost-voice-messages/issues/22)) ([efe4ffb](https://github.com/icoretech/mattermost-voice-messages/commit/efe4ffb5cd7033bd15b02389b63887f5b9057e0a))
+* update dependency vite to v8.3.4 ([#23](https://github.com/icoretech/mattermost-voice-messages/issues/23)) ([837de89](https://github.com/icoretech/mattermost-voice-messages/commit/837de896711f68c428a346c44a5bd8b5022025ad))
+* update go module directive to v1.27.2 ([#24](https://github.com/icoretech/mattermost-voice-messages/issues/24)) ([b6d12b9](https://github.com/icoretech/mattermost-voice-messages/commit/b6d12b9932882a906debd117f64fb0c3f1ba201b))
+
 ## [0.2.0](https://github.com/icoretech/mattermost-voice-messages/compare/v0.1.4...v0.2.0) (2026-10-01)
 
 
