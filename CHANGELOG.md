@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.2](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.1...v0.2.2) (2026-10-13)
+
+
+### Features
+
+* add Parakeet client transcription model ([0bfaa5e](https://github.com/icoretech/mattermost-voice-messages/commit/0bfaa5ec46f3af7751eb47e1c1fcb9242415c749))
+
+
+### Documentation
+
+* describe hosted client transcription requirements ([1094dfe](https://github.com/icoretech/mattermost-voice-messages/commit/1094dfe592ab5679e1fcf7cefa787f6cc3acf48a))
+* document real transcription smoke evidence ([2cea02a](https://github.com/icoretech/mattermost-voice-messages/commit/2cea02a531c399d8c787b54a870f36d226079436))
+
 ## [0.2.1](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.0...v0.2.1) (2026-10-13)
 
 
