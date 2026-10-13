@@ -159,6 +159,16 @@ The Mattermost container is only exposed inside the Compose network. Change
 the public preview port with `MATTERMOST_DEV_PORT`, and change the Site URL
 with `MATTERMOST_DEV_SITE_URL` if you bind the proxy to another hostname.
 
+For a hosted server, apply these requirements before enabling client
+transcription. Check both the HTTP CSP header and Mattermost's HTML CSP meta
+tag: either can block workers or WASM. Scope any CSP rewrite to the application
+HTML and preserve the existing policies on attachments and API responses.
+With `Cross-Origin-Embedder-Policy: require-corp`, enable Mattermost's local
+image proxy to keep public external images available, and test any integrations
+that depend on authenticated external images or popup windows. Confirm
+`crossOriginIsolated` is `true` in the browser and transcribe spoken audio;
+upload and playback checks alone do not verify model inference.
+
 Deploy to a running local or remote Mattermost server with:
 
 ```bash
