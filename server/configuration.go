@@ -207,6 +207,12 @@ func (c *configuration) Validate() error {
 		return fmt.Errorf("invalid ClientTranscriptionQuantization")
 	}
 
+	effectiveModel := c.clientTranscriptionModel()
+	effectiveQuantization := c.clientTranscriptionQuantization()
+	if effectiveModel == "parakeet-ctc-0.6b" && effectiveQuantization != "hybrid" && effectiveQuantization != "q8" && effectiveQuantization != "fp32" {
+		return fmt.Errorf("parakeet-ctc-0.6b requires hybrid, q8, or fp32 ClientTranscriptionQuantization")
+	}
+
 	language := strings.TrimSpace(c.ClientTranscriptionLanguage)
 	if len(language) > 35 {
 		return fmt.Errorf("invalid ClientTranscriptionLanguage")

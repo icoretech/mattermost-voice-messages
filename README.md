@@ -88,9 +88,11 @@ Configure the plugin from **System Console > Plugins > Mattermost Voice Messages
 | `EnableUploadedAudioPreview` | `true` | Uses the voice-message player for supported audio files uploaded outside the recorder. Existing voice-message posts still render normally. |
 | `EnableClientTranscription` | `false` | Allows users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and cross-origin isolation headers on the Mattermost site. |
 | `ClientTranscriptionAutoStart` | `false` | Starts local transcription automatically after recording stops when client transcription is enabled. When disabled, users click **Transcribe locally** in the review panel. |
-| `ClientTranscriptionModel` | `whisper-tiny` | Selects the browser-whisper model to run in the browser. Larger models can require hundreds of MB or GB of local model downloads. |
-| `ClientTranscriptionQuantization` | `hybrid` | Selects the model precision passed to browser-whisper. Use `hybrid` unless a browser/device requires a specific mode. |
+| `ClientTranscriptionModel` | `whisper-tiny` | Selects the browser-whisper model to run in the browser. `whisper-tiny` is the multilingual default. `parakeet-ctc-0.6b` is English-only, produces lowercase text without punctuation or timestamps, and downloads about 612 MB with q8-backed precision. |
+| `ClientTranscriptionQuantization` | `hybrid` | Selects the model precision passed to browser-whisper. Use `hybrid` for the default Whisper models. Parakeet accepts `hybrid` (mapped to q8), `q8`, or `fp32`; `q4` and `fp16` are unsupported for that model. |
 | `ClientTranscriptionLanguage` | empty | Optional BCP-47 language tag passed to browser-whisper, for example `en` or `it`. Leave empty for auto-detect. Models without language support ignore this value. |
+
+Parakeet CTC model details: `parakeet-ctc-0.6b` is an optional NVIDIA Parakeet CTC model for English audio. Its q8-backed download is about 612 MB; `fp32` is about 2.4 GB. It ignores the language setting and does not provide timestamps. The plugin rejects `q4` and `fp16` for this model because browser-whisper 1.2.0 produced empty text for most inputs with those precisions.
 
 Access is inherited from Mattermost permissions:
 

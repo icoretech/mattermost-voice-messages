@@ -25,6 +25,8 @@ func TestGetConfigurationReturnsEmptyDefault(t *testing.T) {
 	p := &Plugin{}
 
 	assert.Equal(t, defaultClientConfiguration(), p.getConfiguration().clientConfiguration())
+	assert.Equal(t, "whisper-tiny", defaultClientTranscriptionModel())
+	assert.Equal(t, "hybrid", defaultClientTranscriptionQuantization())
 }
 
 func TestConfigurationEffectiveBooleansRespectExplicitFalse(t *testing.T) {
@@ -83,6 +85,38 @@ func TestConfigurationUsesManifestTranscriptionOptions(t *testing.T) {
 	require.NoError(t, configuration.Validate())
 	assert.Equal(t, "moonshine-base", configuration.clientTranscriptionModel())
 	assert.Equal(t, "fp16", configuration.clientTranscriptionQuantization())
+}
+
+func TestConfigurationValidatesParakeetQuantization(t *testing.T) {
+	for _, testCase := range []struct {
+		name         string
+		quantization string
+	}{
+		{name: "default hybrid"},
+		{name: "hybrid", quantization: "hybrid"},
+		{name: "q8", quantization: "q8"},
+		{name: "fp32", quantization: "fp32"},
+	} {
+		t.Run("accepts "+testCase.name, func(t *testing.T) {
+			configuration := configuration{
+				ClientTranscriptionModel:        "parakeet-ctc-0.6b",
+				ClientTranscriptionQuantization: testCase.quantization,
+			}
+
+			require.NoError(t, configuration.Validate())
+		})
+	}
+
+	for _, quantization := range []string{"q4", "fp16"} {
+		t.Run("rejects "+quantization, func(t *testing.T) {
+			configuration := configuration{
+				ClientTranscriptionModel:        "parakeet-ctc-0.6b",
+				ClientTranscriptionQuantization: quantization,
+			}
+
+			assert.EqualError(t, configuration.Validate(), "parakeet-ctc-0.6b requires hybrid, q8, or fp32 ClientTranscriptionQuantization")
+		})
+	}
 }
 
 func TestConfigurationTranscriptionOptionsMatchManifestSettings(t *testing.T) {
