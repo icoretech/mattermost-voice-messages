@@ -113,6 +113,10 @@ Use the local Mattermost UI after deployment:
 
 When browser microphone capture is unavailable, use the sample voice post helper only to verify post rendering. Do not treat invalid fake `MediaRecorder` bytes as playback evidence.
 
+For transcription acceptance, use spoken audio and assert recognizable words from that sample; a nonempty hallucination from silence is not a pass. Verify the captured recording contains speech: Chrome's `--use-file-for-fake-audio-capture` can produce digital silence in some environments. A synthetic speech fixture fed through a WebAudio `MediaStreamDestination` can replace only the microphone input while retaining the real plugin `MediaRecorder`, decoder, worker, model download and inference. Test cancellation as well, and do not send the review message on a shared production channel.
+
+Keep the browser origin and Mattermost SiteURL aligned when validating websocket behavior. An alternate local proxy port can correctly isolate the document but fail the server's websocket origin check; verify the real public origin separately and do not attribute that mismatch to the plugin.
+
 ## Mobile emulator smoke checklist
 
 Native Mattermost mobile apps do not load this plugin's webapp bundle. Expected native behavior: the plugin microphone button is absent, and voice messages appear as ordinary posts with audio attachments. Mobile web still loads the plugin UI and should show the custom player.
