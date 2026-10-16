@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.3](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.2...v0.2.3) (2026-10-16)
+
+
+### Dependencies
+
+* update dependency jsdom to v30.1.3 ([#35](https://github.com/icoretech/mattermost-voice-messages/issues/35)) ([b372ffa](https://github.com/icoretech/mattermost-voice-messages/commit/b372ffaf04a2a7aba00b7c26587e60e292eceb8e))
+* update dependency node to v24.22.0 ([#34](https://github.com/icoretech/mattermost-voice-messages/issues/34)) ([5696b10](https://github.com/icoretech/mattermost-voice-messages/commit/5696b10263c14718acb3d98f964d8b1e2138e277))
+* update dependency sass-embedded to v1.105.2 ([#37](https://github.com/icoretech/mattermost-voice-messages/issues/37)) ([fab38f4](https://github.com/icoretech/mattermost-voice-messages/commit/fab38f4a42524bfbfc8970c917007c530bd3a65c))
+* update dependency vitest to v5.0.5 ([#36](https://github.com/icoretech/mattermost-voice-messages/issues/36)) ([ee2496c](https://github.com/icoretech/mattermost-voice-messages/commit/ee2496cd44cc3a32a1b4d863ac865d05612cc027))
+* update react-ecosystem to v19.3.1 ([#32](https://github.com/icoretech/mattermost-voice-messages/issues/32)) ([addb84d](https://github.com/icoretech/mattermost-voice-messages/commit/addb84d276b58fa4b13c6625ca6d5dfab1b477d9))
+
 ## [0.2.2](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.1...v0.2.2) (2026-10-13)
 
 
