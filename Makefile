@@ -269,6 +269,8 @@ endif
 ifneq ($(HAS_WEBAPP),)
 	mkdir -p dist/$(PLUGIN_ID)/webapp
 	cp -r webapp/dist dist/$(PLUGIN_ID)/webapp/
+	mkdir -p dist/$(PLUGIN_ID)/assets/licenses/browser-whisper
+	cp webapp/node_modules/browser-whisper/LICENSE webapp/node_modules/browser-whisper/THIRD_PARTY_NOTICES.md dist/$(PLUGIN_ID)/assets/licenses/browser-whisper/
 endif
 	find dist/$(PLUGIN_ID) -name '.DS_Store' -delete
 ifeq ($(shell uname),Darwin)

@@ -1,10 +1,13 @@
+import { BrowserWhisper } from "browser-whisper";
+import { clientTranscriptionModels } from "../plugin/manifest";
 import { transcribeVoiceMessageBlob } from "./client_transcription";
 
 const cancel = vi.fn();
 const dispose = vi.fn();
 const transcribe = vi.fn();
 
-vi.mock("browser-whisper", () => ({
+vi.mock("browser-whisper", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("browser-whisper")>()),
   BrowserWhisper: vi.fn(function BrowserWhisperMock(this: {
     transcribe: typeof transcribe;
     dispose: typeof dispose;
@@ -16,6 +19,7 @@ vi.mock("browser-whisper", () => ({
 
 describe("client transcription", () => {
   beforeEach(() => {
+    vi.mocked(BrowserWhisper).mockClear();
     cancel.mockReset();
     dispose.mockReset();
     transcribe.mockReset();
@@ -70,12 +74,76 @@ describe("client transcription", () => {
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
+  it.each(clientTranscriptionModels)(
+    "passes configured language only to a language-selectable model: %s",
+    async (model) => {
+      // Given an explicitly configured language and the real module metadata.
+      transcribe.mockReturnValue({ collect: async () => [], cancel });
+
+      // When a recording is transcribed using each offered model.
+      await transcribeVoiceMessageBlob(new Blob(["audio"]), "audio/webm", {
+        model,
+        quantization: "hybrid",
+        language: "it",
+      });
+
+      // Then only multilingual Whisper models receive the language option.
+      const expectedOptions = {
+        model,
+        quantization: "hybrid",
+        ...(model.startsWith("whisper-") || model.startsWith("lite-whisper-")
+          ? { language: "it" }
+          : {}),
+      };
+      expect(BrowserWhisper).toHaveBeenCalledExactlyOnceWith(expectedOptions);
+      expect(dispose).toHaveBeenCalledExactlyOnceWith();
+    },
+  );
+
+  it("omits the language option when automatic detection is configured", async () => {
+    // Given no explicit language.
+    transcribe.mockReturnValue({ collect: async () => [], cancel });
+
+    // When a language-selectable Whisper model transcribes the recording.
+    await transcribeVoiceMessageBlob(new Blob(["audio"]), "audio/webm", {
+      model: "whisper-tiny",
+      quantization: "hybrid",
+      language: "",
+    });
+
+    // Then the library uses its automatic detection default.
+    expect(BrowserWhisper).toHaveBeenCalledExactlyOnceWith({
+      model: "whisper-tiny",
+      quantization: "hybrid",
+    });
+  });
+
+  it("disposes the model when inference rejects", async () => {
+    // Given an inference failure after model creation.
+    transcribe.mockReturnValue({
+      collect: async () => {
+        throw new Error("inference failed");
+      },
+      cancel,
+    });
+
+    // When collection fails, the original error reaches the caller.
+    await expect(
+      transcribeVoiceMessageBlob(new Blob(["audio"]), "audio/webm", {
+        model: "whisper-tiny",
+        quantization: "hybrid",
+        language: "",
+      }),
+    ).rejects.toThrow("inference failed");
+
+    // Then the model is still disposed.
+    expect(dispose).toHaveBeenCalledExactlyOnceWith();
+  });
+
   it("cancels stream and disposes on abort", async () => {
     const abortController = new AbortController();
     transcribe.mockReturnValue({
-      collect: vi.fn(
-        () => new Promise((resolve) => window.setTimeout(resolve, 1000)),
-      ),
+      collect: vi.fn(() => new Promise(() => undefined)),
       cancel,
     });
 

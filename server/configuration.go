@@ -198,7 +198,7 @@ func (c *configuration) clientConfiguration() clientConfiguration {
 
 func (c *configuration) Validate() error {
 	model := strings.TrimSpace(c.ClientTranscriptionModel)
-	if model != "" && !isAllowedClientTranscriptionModel(model) {
+	if model != "" && model != "whisper-large-v3" && !isAllowedClientTranscriptionModel(model) {
 		return fmt.Errorf("invalid ClientTranscriptionModel")
 	}
 
@@ -211,6 +211,9 @@ func (c *configuration) Validate() error {
 	effectiveQuantization := c.clientTranscriptionQuantization()
 	if effectiveModel == "parakeet-ctc-0.6b" && effectiveQuantization != "hybrid" && effectiveQuantization != "q8" && effectiveQuantization != "fp32" {
 		return fmt.Errorf("parakeet-ctc-0.6b requires hybrid, q8, or fp32 ClientTranscriptionQuantization")
+	}
+	if effectiveModel == "parakeet-tdt-0.6b-v3" && effectiveQuantization == "q4" {
+		return fmt.Errorf("parakeet-tdt-0.6b-v3 requires hybrid, fp16, q8, or fp32 ClientTranscriptionQuantization")
 	}
 
 	language := strings.TrimSpace(c.ClientTranscriptionLanguage)
@@ -250,6 +253,21 @@ func (p *Plugin) OnConfigurationChange() error {
 
 	if err := configuration.Validate(); err != nil {
 		return fmt.Errorf("invalid plugin configuration: %w", err)
+	}
+
+	// browser-whisper v2 removed large-v3. Keep saved v1 settings loadable,
+	// but do not rewrite invalid values or persist from the configuration callback.
+	if strings.TrimSpace(configuration.ClientTranscriptionModel) == "whisper-large-v3" {
+		configuration.ClientTranscriptionModel = "whisper-large-v3-turbo"
+		configuration.ClientTranscriptionQuantization = configuration.clientTranscriptionQuantization()
+		switch configuration.ClientTranscriptionQuantization {
+		case "hybrid", "fp32":
+			configuration.ClientTranscriptionQuantization = "q4"
+		}
+		previous := p.getConfiguration()
+		if previous.ClientTranscriptionModel != configuration.ClientTranscriptionModel || previous.ClientTranscriptionQuantization != configuration.ClientTranscriptionQuantization {
+			p.API.LogInfo("migrated retired whisper-large-v3 client transcription settings; save the replacement in System Console", "model", configuration.ClientTranscriptionModel, "quantization", configuration.ClientTranscriptionQuantization)
+		}
 	}
 
 	p.setConfiguration(configuration)

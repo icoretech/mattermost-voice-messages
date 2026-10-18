@@ -50,22 +50,25 @@ describe("client config", () => {
     );
   });
 
-  it("accepts the Parakeet model and its q8 precision from the server", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json({
-          client_transcription_model: "parakeet-ctc-0.6b",
-          client_transcription_quantization: "q8",
-        }),
-      ),
-    );
+  it.each(["parakeet-ctc-0.6b", "parakeet-tdt-0.6b-v3"])(
+    "accepts %s and its q8 precision from the server",
+    async (model) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json({
+            client_transcription_model: model,
+            client_transcription_quantization: "q8",
+          }),
+        ),
+      );
 
-    await expect(loadClientConfig()).resolves.toMatchObject({
-      clientTranscriptionModel: "parakeet-ctc-0.6b",
-      clientTranscriptionQuantization: "q8",
-    });
-  });
+      await expect(loadClientConfig()).resolves.toMatchObject({
+        clientTranscriptionModel: model,
+        clientTranscriptionQuantization: "q8",
+      });
+    },
+  );
 
   it("falls back for invalid or missing fields", async () => {
     vi.stubGlobal(

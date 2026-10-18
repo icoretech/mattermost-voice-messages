@@ -50,11 +50,13 @@ export async function transcribeVoiceMessageBlob(
     throw createAbortError();
   }
 
-  const { BrowserWhisper } = await import("browser-whisper");
+  const { BrowserWhisper, MODELS } = await import("browser-whisper");
   const whisper = new BrowserWhisper({
     model: options.model,
     quantization: options.quantization,
-    language: options.language || undefined,
+    ...(MODELS[options.model].capabilities.language && options.language
+      ? { language: options.language }
+      : {}),
   });
   const file = new File([blob], "voice-message.webm", { type: mimeType });
   const segmentTexts: string[] = [];

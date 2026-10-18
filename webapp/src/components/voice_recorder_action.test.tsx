@@ -12,6 +12,7 @@ import {
   extractWaveformPeaksFromBlob,
   waveformBarCount,
 } from "../audio/waveform";
+import { clientTranscriptionModels } from "../plugin/manifest";
 import { VoiceRecorderAction } from "./voice_recorder_action";
 
 vi.mock("../audio/waveform", async (importOriginal) => {
@@ -33,7 +34,8 @@ const browserWhisperMock = vi.hoisted(() => ({
   transcribe: vi.fn(),
 }));
 
-vi.mock("browser-whisper", () => ({
+vi.mock("browser-whisper", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("browser-whisper")>()),
   BrowserWhisper: vi.fn(function BrowserWhisperMock(this: {
     dispose: typeof browserWhisperMock.dispose;
     transcribe: typeof browserWhisperMock.transcribe;
@@ -41,10 +43,6 @@ vi.mock("browser-whisper", () => ({
     this.dispose = browserWhisperMock.dispose;
     this.transcribe = browserWhisperMock.transcribe;
   }),
-  MODELS: {
-    "whisper-tiny": {},
-    "whisper-base": {},
-  },
 }));
 
 type FakeTrack = {
@@ -386,6 +384,106 @@ describe("VoiceRecorderAction", () => {
     await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
     const [, init] = getUploadFetchCalls()[0];
     expect((init?.body as FormData | undefined)?.get("transcript")).toBeNull();
+  });
+
+  it.each([
+    {
+      model: "parakeet-ctc-0.6b",
+      name: "NVIDIA Parakeet CTC",
+      converters: ["onnx-community"],
+    },
+    {
+      model: "parakeet-tdt-0.6b-v3",
+      name: "NVIDIA Parakeet TDT v3",
+      converters: ["istupakov", "ysdede"],
+    },
+  ])(
+    "credits $name when that model is offered in review",
+    async ({ model, name, converters }) => {
+      // Given local transcription configured with a Parakeet model.
+      installRecorderEnvironment(
+        { stop: vi.fn() },
+        {
+          config: {
+            client_transcription_enabled: true,
+            client_transcription_model: model,
+          },
+        },
+      );
+      render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+
+      // When the recording reaches review, before inference is requested.
+      await recordAndReview();
+
+      // Then the original model and license are visible and conversion credits are discoverable.
+      expect(screen.getByRole("link", { name })).toHaveAttribute(
+        "href",
+        `https://huggingface.co/nvidia/${model}`,
+      );
+      expect(screen.getByRole("link", { name: "CC BY 4.0" })).toHaveAttribute(
+        "href",
+        "https://creativecommons.org/licenses/by/4.0/",
+      );
+      const summary = screen.getByText("Model credits");
+      expect(summary.tagName).toBe("SUMMARY");
+      fireEvent.click(summary);
+      expect(summary.parentElement).toHaveAttribute("open");
+      for (const converter of converters) {
+        expect(screen.getByRole("link", { name: converter })).toHaveAttribute(
+          "target",
+          "_blank",
+        );
+      }
+      expect(browserWhisperMock.transcribe).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    clientTranscriptionModels.filter((model) => !model.startsWith("parakeet-")),
+  )("omits Parakeet credits for the %s model", async (model) => {
+    // Given another supported transcription model.
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      {
+        config: {
+          client_transcription_enabled: true,
+          client_transcription_model: model,
+        },
+      },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+
+    // When review offers transcription.
+    await recordAndReview();
+
+    // Then no unrelated license attribution is shown.
+    expect(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Model credits")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "CC BY 4.0" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("omits Parakeet credits when local transcription is disabled", async () => {
+    // Given a stored Parakeet model choice with transcription disabled.
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      {
+        config: { client_transcription_model: "parakeet-ctc-0.6b" },
+      },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+
+    // When review opens.
+    await recordAndReview();
+
+    // Then no unavailable transcription model is advertised.
+    expect(screen.queryByText("Model credits")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "CC BY 4.0" }),
+    ).not.toBeInTheDocument();
   });
 
   it("transcribes manually and sends the transcript", async () => {

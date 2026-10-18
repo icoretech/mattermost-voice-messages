@@ -55,7 +55,7 @@
                 "key": "ClientTranscriptionModel",
                 "display_name": "Client Transcription Model",
                 "type": "dropdown",
-                "help_text": "browser-whisper model to run in the browser. whisper-tiny remains the multilingual default. parakeet-ctc-0.6b is English-only, produces lowercase text without punctuation or timestamps, and needs hybrid/q8 precision for a download of about 612 MB.",
+                "help_text": "browser-whisper model to run in the browser. whisper-tiny remains the multilingual default. Parakeet TDT supports 25 languages with automatic detection and needs WebGPU; q8 is recommended (~670 MB). Parakeet CTC is English-only, has no punctuation or timestamps, and downloads ~612 MB with hybrid/q8. Both Parakeet models are by [NVIDIA](https://huggingface.co/nvidia), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). ONNX conversions: TDT by istupakov (int8) and ysdede (fp16/cast fixes); CTC by onnx-community.",
                 "default": "whisper-tiny",
                 "options": [
                     {
@@ -91,8 +91,8 @@
                         "value": "whisper-large-v3-turbo_timestamped"
                     },
                     {
-                        "display_name": "whisper-large-v3",
-                        "value": "whisper-large-v3"
+                        "display_name": "parakeet-tdt-0.6b-v3 (25 languages, WebGPU, q8 ~670 MB)",
+                        "value": "parakeet-tdt-0.6b-v3"
                     },
                     {
                         "display_name": "lite-whisper-large-v3-turbo-fast",
@@ -128,7 +128,7 @@
                 "key": "ClientTranscriptionQuantization",
                 "display_name": "Client Transcription Quantization",
                 "type": "dropdown",
-                "help_text": "Model precision passed to browser-whisper. Use hybrid for the default Whisper models. Parakeet CTC accepts hybrid (mapped to q8), q8, or fp32; q4 and fp16 are unsupported for that model.",
+                "help_text": "Model precision passed to browser-whisper. Use hybrid for the default Whisper models. Parakeet TDT: q8 is recommended (~670 MB); hybrid/fp16 requires WebGPU shader-f16 (~1.26 GB); fp32 (~2.4 GB) can exceed browser allocation limits; q4 is unsupported. Parakeet CTC accepts hybrid (mapped to q8), q8, or fp32; q4 and fp16 are unsupported. Saved whisper-large-v3 settings migrate to whisper-large-v3-turbo; hybrid/default and fp32 migrate to q4.",
                 "default": "hybrid",
                 "options": [
                     {

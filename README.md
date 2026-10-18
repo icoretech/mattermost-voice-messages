@@ -88,11 +88,17 @@ Configure the plugin from **System Console > Plugins > Mattermost Voice Messages
 | `EnableUploadedAudioPreview` | `true` | Uses the voice-message player for supported audio files uploaded outside the recorder. Existing voice-message posts still render normally. |
 | `EnableClientTranscription` | `false` | Allows users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and cross-origin isolation headers on the Mattermost site. |
 | `ClientTranscriptionAutoStart` | `false` | Starts local transcription automatically after recording stops when client transcription is enabled. When disabled, users click **Transcribe locally** in the review panel. |
-| `ClientTranscriptionModel` | `whisper-tiny` | Selects the browser-whisper model to run in the browser. `whisper-tiny` is the multilingual default. `parakeet-ctc-0.6b` is English-only, produces lowercase text without punctuation or timestamps, and downloads about 612 MB with q8-backed precision. |
-| `ClientTranscriptionQuantization` | `hybrid` | Selects the model precision passed to browser-whisper. Use `hybrid` for the default Whisper models. Parakeet accepts `hybrid` (mapped to q8), `q8`, or `fp32`; `q4` and `fp16` are unsupported for that model. |
+| `ClientTranscriptionModel` | `whisper-tiny` | Selects the browser-whisper model to run in the browser. `whisper-tiny` is the multilingual default. `parakeet-tdt-0.6b-v3` supports 25 languages with automatic detection and requires WebGPU; q8 is recommended (~670 MB). `parakeet-ctc-0.6b` is English-only (~612 MB with q8), without punctuation or timestamps. |
+| `ClientTranscriptionQuantization` | `hybrid` | Selects the model precision passed to browser-whisper. Use `hybrid` for the default Whisper models. Parakeet TDT accepts `hybrid`/`fp16`, `q8`, or `fp32`; `q4` is unsupported. Parakeet CTC accepts `hybrid` (mapped to q8), `q8`, or `fp32`; `q4` and `fp16` are unsupported. |
 | `ClientTranscriptionLanguage` | empty | Optional BCP-47 language tag passed to browser-whisper, for example `en` or `it`. Leave empty for auto-detect. Models without language support ignore this value. |
 
-Parakeet CTC model details: `parakeet-ctc-0.6b` is an optional NVIDIA Parakeet CTC model for English audio. Its q8-backed download is about 612 MB; `fp32` is about 2.4 GB. It ignores the language setting and does not provide timestamps. The plugin rejects `q4` and `fp16` for this model because browser-whisper 1.2.0 produced empty text for most inputs with those precisions.
+`parakeet-tdt-0.6b-v3` is an optional NVIDIA model with automatic recognition of 25 languages, punctuation, and word timestamps. It requires WebGPU and has no WASM fallback. Use `q8` for a download of about 670 MB. `hybrid` uses the fp16 encoder, just like `fp16`; both need the GPU's `shader-f16` capability and download about 1.26 GB. `fp32` needs about 2.4 GB and can fail at the browser's allocation limits. The model ignores the language setting; `q4` is rejected.
+
+`parakeet-ctc-0.6b` remains available for English audio. Its q8-backed download is about 612 MB; `fp32` is about 2.4 GB. It ignores the language setting and does not provide punctuation or timestamps. The plugin rejects `q4` and `fp16` because those precisions can produce empty text.
+
+Both [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) and [Parakeet CTC 0.6B](https://huggingface.co/nvidia/parakeet-ctc-0.6b) are by NVIDIA and licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The TDT weights were converted to ONNX with int8 quantization by [istupakov](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx), with fp16 export and cast fixes by [ysdede](https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx). The CTC weights were converted to ONNX and quantized by [onnx-community](https://huggingface.co/onnx-community/parakeet-ctc-0.6b-ONNX). Model weights download directly to the browser; the plugin does not modify or bundle them.
+
+browser-whisper 2 removes `whisper-large-v3`. Existing saved settings load as `whisper-large-v3-turbo`; legacy `hybrid` (including the default) and `fp32` precision become `q4`, while `q4`, `q8`, and `fp16` are preserved. This migration applies only to the retired model, leaves other settings unchanged, and logs the effective replacement when loaded. Save the replacement model and precision in System Console to update the stored settings.
 
 Access is inherited from Mattermost permissions:
 
@@ -146,13 +152,14 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 It also relaxes the local preview Content Security Policy enough for
-browser-whisper workers and their WASM backend module loading:
+browser-whisper workers, WASM backend modules, and Parakeet TDT runtime imports
+from jsDelivr:
 
 ```text
 worker-src 'self' blob:
 child-src 'self' blob:
-script-src 'self' 'wasm-unsafe-eval' blob:
-script-src-elem 'self' 'wasm-unsafe-eval' blob:
+script-src 'self' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net
+script-src-elem 'self' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net
 ```
 
 The Mattermost container is only exposed inside the Compose network. Change
