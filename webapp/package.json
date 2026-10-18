@@ -32,7 +32,7 @@
     "vitest": "5.0.5"
   },
   "dependencies": {
-    "browser-whisper": "1.2.0"
+    "browser-whisper": "2.0.0"
   },
   "overrides": {
     "@huggingface/transformers": {
