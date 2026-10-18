@@ -6,6 +6,7 @@ import manifest, {
 
 type ManifestSetting = {
   key?: unknown;
+  help_text?: string;
   options?: Array<{ value?: unknown }>;
 };
 
@@ -35,6 +36,27 @@ describe("generated manifest transcription domains", () => {
     expect(offeredModels).toEqual(availableModels);
     for (const model of clientTranscriptionModels) {
       expect(typeof MODELS[model].capabilities.language).toBe("boolean");
+    }
+  });
+
+  it("keeps Parakeet attribution in the generated model setting help", () => {
+    // Given the generated settings consumed by the plugin configuration UI.
+    const settings: ManifestSetting[] = manifest.settings_schema.settings;
+
+    // When reading the selectable transcription model's help.
+    const helpText = settings.find(
+      (setting) => setting.key === "ClientTranscriptionModel",
+    )?.help_text;
+
+    // Then author, license, and conversion credits remain available there.
+    for (const credit of [
+      "[NVIDIA](https://huggingface.co/nvidia)",
+      "[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)",
+      "istupakov",
+      "ysdede",
+      "onnx-community",
+    ]) {
+      expect(helpText).toContain(credit);
     }
   });
 

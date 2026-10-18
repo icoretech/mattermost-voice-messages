@@ -12,7 +12,6 @@ import {
   extractWaveformPeaksFromBlob,
   waveformBarCount,
 } from "../audio/waveform";
-import { clientTranscriptionModels } from "../plugin/manifest";
 import { VoiceRecorderAction } from "./voice_recorder_action";
 
 vi.mock("../audio/waveform", async (importOriginal) => {
@@ -386,20 +385,9 @@ describe("VoiceRecorderAction", () => {
     expect((init?.body as FormData | undefined)?.get("transcript")).toBeNull();
   });
 
-  it.each([
-    {
-      model: "parakeet-ctc-0.6b",
-      name: "NVIDIA Parakeet CTC",
-      converters: ["onnx-community"],
-    },
-    {
-      model: "parakeet-tdt-0.6b-v3",
-      name: "NVIDIA Parakeet TDT v3",
-      converters: ["istupakov", "ysdede"],
-    },
-  ])(
-    "credits $name when that model is offered in review",
-    async ({ model, name, converters }) => {
+  it.each(["parakeet-ctc-0.6b", "parakeet-tdt-0.6b-v3"])(
+    "keeps %s review focused on recording controls without model credits",
+    async (model) => {
       // Given local transcription configured with a Parakeet model.
       installRecorderEnvironment(
         { stop: vi.fn() },
@@ -415,76 +403,23 @@ describe("VoiceRecorderAction", () => {
       // When the recording reaches review, before inference is requested.
       await recordAndReview();
 
-      // Then the original model and license are visible and conversion credits are discoverable.
-      expect(screen.getByRole("link", { name })).toHaveAttribute(
-        "href",
-        `https://huggingface.co/nvidia/${model}`,
-      );
-      expect(screen.getByRole("link", { name: "CC BY 4.0" })).toHaveAttribute(
-        "href",
-        "https://creativecommons.org/licenses/by/4.0/",
-      );
-      const summary = screen.getByText("Model credits");
-      expect(summary.tagName).toBe("SUMMARY");
-      fireEvent.click(summary);
-      expect(summary.parentElement).toHaveAttribute("open");
-      for (const converter of converters) {
-        expect(screen.getByRole("link", { name: converter })).toHaveAttribute(
-          "target",
-          "_blank",
-        );
+      // Then review exposes its actions without attribution or license links.
+      for (const name of [
+        "Play voice message",
+        "Transcribe voice message locally",
+        "Send voice message",
+        "Cancel recording",
+      ]) {
+        expect(screen.getByRole("button", { name })).toBeVisible();
+        expect(screen.getByRole("button", { name })).toBeEnabled();
       }
+      expect(
+        screen.queryByText(/Model credits|NVIDIA|CC BY 4\.0/i),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
       expect(browserWhisperMock.transcribe).not.toHaveBeenCalled();
     },
   );
-
-  it.each(
-    clientTranscriptionModels.filter((model) => !model.startsWith("parakeet-")),
-  )("omits Parakeet credits for the %s model", async (model) => {
-    // Given another supported transcription model.
-    installRecorderEnvironment(
-      { stop: vi.fn() },
-      {
-        config: {
-          client_transcription_enabled: true,
-          client_transcription_model: model,
-        },
-      },
-    );
-    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
-
-    // When review offers transcription.
-    await recordAndReview();
-
-    // Then no unrelated license attribution is shown.
-    expect(
-      screen.getByRole("button", { name: "Transcribe voice message locally" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Model credits")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "CC BY 4.0" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("omits Parakeet credits when local transcription is disabled", async () => {
-    // Given a stored Parakeet model choice with transcription disabled.
-    installRecorderEnvironment(
-      { stop: vi.fn() },
-      {
-        config: { client_transcription_model: "parakeet-ctc-0.6b" },
-      },
-    );
-    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
-
-    // When review opens.
-    await recordAndReview();
-
-    // Then no unavailable transcription model is advertised.
-    expect(screen.queryByText("Model credits")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "CC BY 4.0" }),
-    ).not.toBeInTheDocument();
-  });
 
   it("transcribes manually and sends the transcript", async () => {
     const track = { stop: vi.fn() };

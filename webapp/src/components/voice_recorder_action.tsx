@@ -1,7 +1,6 @@
 import React, { useRef } from "react";
 import { createPortal } from "react-dom";
 import { useVoiceMessagesClientConfig } from "../api/client_config";
-import type { ClientTranscriptionModel } from "../plugin/manifest";
 import { useComposerActionsTarget } from "../voice_recorder/use_composer_actions_target";
 import {
   type ReviewRecording,
@@ -70,78 +69,8 @@ function RecordingPanel({
   );
 }
 
-function ParakeetAttribution({
-  model,
-}: {
-  readonly model: ClientTranscriptionModel;
-}) {
-  if (model !== "parakeet-ctc-0.6b" && model !== "parakeet-tdt-0.6b-v3") {
-    return null;
-  }
-
-  const isTdt = model === "parakeet-tdt-0.6b-v3";
-  return (
-    <div className="VoiceRecorderAction__modelAttribution VoiceRecorderAction__transcriptionHelp">
-      <span>
-        <a
-          href={`https://huggingface.co/nvidia/${model}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          NVIDIA Parakeet {isTdt ? "TDT v3" : "CTC"}
-        </a>{" "}
-        ·{" "}
-        <a
-          href="https://creativecommons.org/licenses/by/4.0/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          CC BY 4.0
-        </a>
-      </span>
-      <details>
-        <summary>Model credits</summary>
-        {isTdt ? (
-          <span>
-            © NVIDIA. Converted to ONNX with int8 quantization by{" "}
-            <a
-              href="https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              istupakov
-            </a>
-            ; fp16 export and cast fixes by{" "}
-            <a
-              href="https://huggingface.co/ysdede/parakeet-tdt-0.6b-v3-onnx"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ysdede
-            </a>
-            .
-          </span>
-        ) : (
-          <span>
-            © NVIDIA. Converted to ONNX and quantized (q8/q4/fp16) by{" "}
-            <a
-              href="https://huggingface.co/onnx-community/parakeet-ctc-0.6b-ONNX"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              onnx-community
-            </a>
-            .
-          </span>
-        )}
-      </details>
-    </div>
-  );
-}
-
 function ReviewPanel({
   clientTranscriptionEnabled,
-  clientTranscriptionModel,
   onCancel,
   onCancelTranscription,
   onSend,
@@ -154,7 +83,6 @@ function ReviewPanel({
   transcriptionStatus,
 }: {
   clientTranscriptionEnabled: boolean;
-  clientTranscriptionModel: ClientTranscriptionModel;
   onCancel: () => void;
   onCancelTranscription: () => void;
   onSend: () => void;
@@ -177,7 +105,6 @@ function ReviewPanel({
       />
       {clientTranscriptionEnabled ? (
         <div className="VoiceRecorderAction__transcription">
-          <ParakeetAttribution model={clientTranscriptionModel} />
           {transcriptionStatus === "transcribing" ? (
             <div className="VoiceRecorderAction__transcriptionStatus">
               <span>Transcribing locally…</span>
@@ -367,7 +294,6 @@ function VoiceRecorderSession({ draft }: VoiceRecorderActionProps) {
       content = controller.review ? (
         <ReviewPanel
           clientTranscriptionEnabled={config.clientTranscriptionEnabled}
-          clientTranscriptionModel={config.clientTranscriptionModel}
           review={controller.review}
           transcript={controller.transcript}
           transcriptionStatus={controller.transcriptionStatus}
