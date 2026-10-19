@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.0...v0.3.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* render project links in Mattermost 12 settings ([04ba651](https://github.com/icoretech/mattermost-voice-messages/commit/04ba6519f96ebd3553ce9fe6ff3b6247a00cac44))
+
 ## [0.3.0](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.2...v0.3.0) (2026-10-19)
 
 
