@@ -106,11 +106,8 @@ function ReviewPanel({
       {clientTranscriptionEnabled ? (
         <div className="VoiceRecorderAction__transcription">
           {transcriptionStatus === "transcribing" ? (
-            <div className="VoiceRecorderAction__transcriptionStatus">
-              <span>Transcribing locally…</span>
-              {transcriptionProgressLabel ? (
-                <span>{transcriptionProgressLabel}</span>
-              ) : null}
+            <div className="VoiceRecorderAction__transcriptionStatus VoiceRecorderAction__transcriptionStatus--busy">
+              <span role="status">{transcriptionProgressLabel}</span>
               <button
                 className="VoiceRecorderAction__transcriptionButton"
                 type="button"
@@ -118,6 +115,21 @@ function ReviewPanel({
                 onClick={onCancelTranscription}
               >
                 Cancel
+              </button>
+            </div>
+          ) : null}
+          {transcriptionStatus === "empty" ? (
+            <div className="VoiceRecorderAction__transcriptionStatus VoiceRecorderAction__transcriptionStatus--empty">
+              <span role="status">
+                No speech recognized. Try again or send the audio.
+              </span>
+              <button
+                className="VoiceRecorderAction__transcriptionButton"
+                type="button"
+                aria-label="Transcribe voice message locally"
+                onClick={onStartTranscription}
+              >
+                Try again
               </button>
             </div>
           ) : null}
@@ -139,7 +151,7 @@ function ReviewPanel({
               </button>
             </div>
           ) : null}
-          {transcript ? (
+          {transcript && transcriptionStatus !== "transcribing" ? (
             <>
               <textarea
                 className="VoiceRecorderAction__transcriptTextarea"
@@ -167,7 +179,16 @@ function ReviewPanel({
       ) : null}
       <div className="VoiceRecorderAction__reviewActions">
         <button
+          className="VoiceRecorderAction__cancelButton"
+          type="button"
+          aria-label="Cancel recording"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        <button
           className="VoiceRecorderAction__sendButton"
+          disabled={transcriptionStatus === "transcribing"}
           type="button"
           aria-label="Send voice message"
           title="Send voice message"
@@ -175,13 +196,6 @@ function ReviewPanel({
         >
           Send
         </button>
-        <button
-          className="VoiceRecorderAction__iconButton VoiceRecorderAction__iconButton--cancel"
-          type="button"
-          aria-label="Cancel recording"
-          title="Cancel recording"
-          onClick={onCancel}
-        />
       </div>
     </div>
   );

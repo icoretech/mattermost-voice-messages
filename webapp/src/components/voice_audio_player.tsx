@@ -298,34 +298,12 @@ function VoiceAudioPlayerSession({
     );
   }
 
-  if (variant === "preview") {
-    return (
-      <div
-        className={[
-          "VoiceMessagePost",
-          compact ? "VoiceMessagePost--compact" : "",
-          "VoiceMessagePost--preview",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <VoicePlaybackButton
-          playing={state.playing}
-          onPause={pauseVoiceMessage}
-          onPlay={playVoiceMessage}
-        />
-        <span className="VoiceMessagePost__timeline">
-          {formatPlaybackTime(resolvedDurationMs)}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div
       className={[
         "VoiceMessagePost",
         compact ? "VoiceMessagePost--compact" : "",
+        variant === "preview" ? "VoiceMessagePost--preview" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -367,25 +345,31 @@ function VoiceAudioPlayerSession({
           />
         </label>
 
-        <div className="VoiceMessagePost__meta">
+        {variant === "preview" ? (
           <span className="VoiceMessagePost__timeline">
-            {formatPlaybackTime(state.elapsedMs)} /{" "}
             {formatPlaybackTime(resolvedDurationMs)}
           </span>
-          <span className="VoiceMessagePost__speedControls">
-            {playbackSpeeds.map((playbackSpeed) => (
-              <button
-                className="VoiceMessagePost__speedButton"
-                type="button"
-                aria-pressed={speed === playbackSpeed}
-                key={playbackSpeed}
-                onClick={() => updateSpeed(playbackSpeed)}
-              >
-                {playbackSpeed}x
-              </button>
-            ))}
-          </span>
-        </div>
+        ) : (
+          <div className="VoiceMessagePost__meta">
+            <span className="VoiceMessagePost__timeline">
+              {formatPlaybackTime(state.elapsedMs)} /{" "}
+              {formatPlaybackTime(resolvedDurationMs)}
+            </span>
+            <span className="VoiceMessagePost__speedControls">
+              {playbackSpeeds.map((playbackSpeed) => (
+                <button
+                  className="VoiceMessagePost__speedButton"
+                  type="button"
+                  aria-pressed={speed === playbackSpeed}
+                  key={playbackSpeed}
+                  onClick={() => updateSpeed(playbackSpeed)}
+                >
+                  {playbackSpeed}x
+                </button>
+              ))}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

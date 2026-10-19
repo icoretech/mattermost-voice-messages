@@ -30,7 +30,7 @@ export type RecorderStatus =
   | "uploading"
   | "error";
 
-export type TranscriptionStatus = "idle" | "transcribing" | "error";
+export type TranscriptionStatus = "idle" | "transcribing" | "empty" | "error";
 
 export type ReviewRecording = {
   id: number;
@@ -63,7 +63,15 @@ export type RecorderController = {
 function formatTranscriptionProgress(
   progress: LocalTranscriptionProgress,
 ): string {
-  return `${progress.stage} ${Math.round(progress.progress * 100)}%`;
+  switch (progress.stage) {
+    case "loading":
+      return "Preparing model…";
+    case "decoding":
+      return "Preparing audio…";
+    case "transcribing":
+    case "done":
+      return "Transcribing…";
+  }
 }
 
 function useRecordingLifecycle(status: RecorderStatus) {
@@ -225,7 +233,7 @@ function useTranscriptionLifecycle() {
     transcriptionAbortControllerRef.current = abortController;
     setTranscriptionStatus("transcribing");
     setTranscriptionError("");
-    setTranscriptionProgressLabel("loading 0%");
+    setTranscriptionProgressLabel("Preparing model…");
     return abortController;
   }, [abortActiveTranscription]);
 
@@ -239,8 +247,9 @@ function useTranscriptionLifecycle() {
   );
 
   const completeTranscription = useCallback((text: string) => {
-    setTranscript(text);
-    setTranscriptionStatus("idle");
+    const completedTranscript = text.trim();
+    setTranscript(completedTranscript);
+    setTranscriptionStatus(completedTranscript ? "idle" : "empty");
     setTranscriptionError("");
     setTranscriptionProgressLabel("");
   }, []);

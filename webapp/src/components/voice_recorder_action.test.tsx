@@ -414,6 +414,12 @@ describe("VoiceRecorderAction", () => {
         expect(screen.getByRole("button", { name })).toBeEnabled();
       }
       expect(
+        screen.getByRole("button", { name: "Cancel recording" }),
+      ).toHaveTextContent("Cancel");
+      expect(
+        screen.getByRole("button", { name: "Send voice message" }),
+      ).toHaveTextContent("Send");
+      expect(
         screen.queryByText(/Model credits|NVIDIA|CC BY 4\.0/i),
       ).not.toBeInTheDocument();
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
@@ -484,6 +490,196 @@ describe("VoiceRecorderAction", () => {
     expect((init?.body as FormData | undefined)?.get("audio")).toBeInstanceOf(
       File,
     );
+  });
+
+  it.each([{ segments: [] }, { segments: [{ text: " \n\t " }] }])(
+    "shows an explicit empty result and preserves audio sending for $segments",
+    async ({ segments }) => {
+      // Given a recording whose transcription completes without words.
+      installRecorderEnvironment(
+        { stop: vi.fn() },
+        {
+          config: { client_transcription_enabled: true },
+        },
+      );
+      browserWhisperMock.transcribe.mockReturnValue({
+        cancel: browserWhisperMock.cancel,
+        collect: vi.fn(async () => segments),
+      });
+      render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+      await recordAndReview();
+
+      // When transcription completes and the original audio is sent.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Transcribe voice message locally",
+        }),
+      );
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "No speech recognized",
+        ),
+      );
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: "Transcribe voice message locally",
+        }),
+      ).toBeEnabled();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Send voice message" }),
+      );
+
+      // Then sending remains available without fabricating a transcript.
+      await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+      const form = getUploadFetchCalls()[0][1]?.body;
+      expect(form).toBeInstanceOf(FormData);
+      if (!(form instanceof FormData))
+        throw new Error("Expected voice upload form");
+      expect(form.get("audio")).toBeInstanceOf(File);
+      expect(form.get("transcript")).toBeNull();
+    },
+  );
+
+  it("retries an empty transcription on the same recording", async () => {
+    // Given a completed empty transcription.
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      {
+        config: { client_transcription_enabled: true },
+      },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    await recordAndReview();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "No speech recognized",
+      ),
+    );
+    browserWhisperMock.transcribe.mockReturnValueOnce({
+      cancel: browserWhisperMock.cancel,
+      collect: vi.fn(async () => [{ text: "recognized on retry" }]),
+    });
+
+    // When the user retries without recording again.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    );
+
+    // Then the successful result replaces the empty outcome.
+    expect(
+      await screen.findByRole("textbox", { name: "Voice message transcript" }),
+    ).toHaveValue("recognized on retry");
+    expect(screen.queryByText(/No speech recognized/)).not.toBeInTheDocument();
+    expect(browserWhisperMock.transcribe).toHaveBeenCalledTimes(2);
+    expect(FakeMediaRecorder.instances).toHaveLength(1);
+  });
+
+  it("reports phases without resetting percentages and cancels pending transcription", async () => {
+    // Given a transcription that stays pending while stage events arrive.
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      {
+        config: { client_transcription_enabled: true },
+      },
+    );
+    const completion = Promise.withResolvers<{ text: string }[]>();
+    browserWhisperMock.transcribe.mockReturnValue({
+      cancel: browserWhisperMock.cancel,
+      collect: () => completion.promise,
+    });
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    await recordAndReview();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    );
+    await waitFor(() =>
+      expect(browserWhisperMock.transcribe).toHaveBeenCalledTimes(1),
+    );
+    const options = browserWhisperMock.transcribe.mock.calls[0][1];
+
+    // When per-stage progress resets, the same status row names each phase.
+    for (const [stage, progress, label] of [
+      ["loading", 0.99, "Preparing model"],
+      ["decoding", 0, "Preparing audio"],
+      ["transcribing", 0, "Transcribing"],
+      ["done", 1, "Transcribing"],
+    ]) {
+      act(() => options.onProgress({ stage, progress }));
+      expect(screen.getByRole("status")).toHaveTextContent(String(label));
+      expect(screen.getByRole("status")).not.toHaveTextContent(/\d+%/);
+      expect(
+        screen.getByRole("button", { name: "Cancel transcription" }),
+      ).toBeEnabled();
+    }
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cancel transcription" }),
+    );
+    await act(async () => completion.resolve([]));
+
+    // Then cancellation preserves review and ignores the late empty completion.
+    expect(browserWhisperMock.cancel).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeEnabled();
+  });
+
+  it("waits for transcription completion before editing or sending text", async () => {
+    // Given a stream that has emitted a segment but has not completed.
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      {
+        config: { client_transcription_enabled: true },
+      },
+    );
+    const completion = Promise.withResolvers<{ text: string }[]>();
+    browserWhisperMock.transcribe.mockImplementation((_file: File, options) => {
+      options.onSegment({ text: "first segment" });
+      return {
+        cancel: browserWhisperMock.cancel,
+        collect: () => completion.promise,
+      };
+    });
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    await recordAndReview();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    );
+    await waitFor(() =>
+      expect(browserWhisperMock.transcribe).toHaveBeenCalledTimes(1),
+    );
+    expect(
+      screen.queryByRole("textbox", { name: "Voice message transcript" }),
+    ).not.toBeInTheDocument();
+    const sendButton = screen.getByRole("button", {
+      name: "Send voice message",
+    });
+    expect(sendButton).toBeDisabled();
+    fireEvent.click(sendButton);
+    expect(getUploadFetchCalls()).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Cancel transcription" }),
+    ).toBeEnabled();
+
+    // When the stream finishes, replace the busy row with editable text once.
+    await act(async () => completion.resolve([]));
+
+    // Then the final transcript can be edited and sent.
+    const transcript = screen.getByRole("textbox", {
+      name: "Voice message transcript",
+    });
+    expect(transcript).toHaveValue("first segment");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(sendButton).toBeEnabled();
+    fireEvent.change(transcript, { target: { value: "edited transcript" } });
+    expect(transcript).toHaveValue("edited transcript");
   });
 
   it("auto-starts transcription after recording review is created", async () => {

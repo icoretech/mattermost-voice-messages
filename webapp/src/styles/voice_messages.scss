@@ -60,28 +60,54 @@
 }
 
 .VoiceRecorderAction__panel--review {
-  align-items: flex-start;
+  align-items: stretch;
   background: var(--center-channel-bg, #fff);
   border: 1px solid rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.16);
   border-radius: 12px;
   bottom: calc(100% + 6px);
+  box-sizing: border-box;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
   flex-direction: column;
-  gap: 6px;
-  max-width: min(360px, calc(100vw - 32px));
-  padding: 8px;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
   position: absolute;
   right: 0;
-  width: max-content;
+  width: 280px;
   z-index: 5;
 }
 
 .VoiceRecorderAction__reviewActions {
   align-items: center;
-  display: inline-flex;
-  gap: 4px;
-  justify-content: flex-end;
+  border-top: 1px solid rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.12);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-top: 10px;
   width: 100%;
+}
+
+.VoiceRecorderAction__cancelButton {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.72);
+  cursor: pointer;
+  font: inherit;
+  min-height: 32px;
+  padding: 0 8px;
+}
+
+.VoiceRecorderAction__cancelButton:hover,
+.VoiceRecorderAction__cancelButton:focus-visible {
+  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.08);
+}
+
+.VoiceRecorderAction__reviewActions .VoiceRecorderAction__sendButton {
+  border-radius: 4px;
+  min-height: 32px;
+  min-width: 68px;
+  padding: 0 14px;
 }
 
 .VoiceRecorderAction__panel--recording {
@@ -173,6 +199,11 @@
   filter: brightness(0.96);
 }
 
+.VoiceRecorderAction__sendButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .VoiceRecorderAction__transcription {
   display: flex;
   flex-direction: column;
@@ -183,21 +214,21 @@
 }
 
 .VoiceRecorderAction__transcriptionButton {
-  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.08);
+  background: transparent;
   border: 0;
-  border-radius: 999px;
-  color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.88);
+  border-radius: 4px;
+  color: var(--link-color, var(--button-bg, currentColor));
   cursor: pointer;
   font: inherit;
   line-height: 1.2;
-  min-height: 26px;
-  padding: 0 10px;
+  min-height: 28px;
+  padding: 0 4px;
   width: fit-content;
 }
 
 .VoiceRecorderAction__transcriptionButton:hover,
 .VoiceRecorderAction__transcriptionButton:focus-visible {
-  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.14);
+  background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.06);
 }
 
 .VoiceRecorderAction__transcriptionStatus {
@@ -211,7 +242,25 @@
   min-width: 0;
 }
 
-.VoiceRecorderAction__transcriptionStatus--error {
+.VoiceRecorderAction__transcriptionStatus--busy {
+  flex-wrap: nowrap;
+  height: 28px;
+  justify-content: space-between;
+  white-space: nowrap;
+}
+
+.VoiceRecorderAction__transcriptionStatus--busy > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.VoiceRecorderAction__transcriptionStatus--busy > button {
+  flex-shrink: 0;
+}
+
+.VoiceRecorderAction__transcriptionStatus--error,
+.VoiceRecorderAction__transcriptionStatus--empty {
   align-items: flex-start;
   flex-direction: column;
 }
@@ -228,6 +277,7 @@
   color: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.92);
   font: inherit;
   min-height: 56px;
+  max-height: 160px;
   padding: 6px 8px;
   resize: vertical;
   width: 100%;
@@ -272,24 +322,27 @@
 }
 
 .VoiceMessagePost--preview {
-  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
-  gap: 6px;
-  height: 28px;
-  max-width: 116px;
+  gap: 10px;
+  height: 36px;
+  max-width: 100%;
   min-width: 0;
-  padding: 2px 7px;
+  padding: 0;
+  width: 100%;
 }
 
 .VoiceMessagePost--preview .VoiceMessagePost__playButton {
-  height: 22px;
-  width: 22px;
+  height: 32px;
+  width: 32px;
 }
 
 .VoiceMessagePost--preview .VoiceMessagePost__playIcon {
-  border-bottom-width: 5px;
-  border-left-width: 8px;
-  border-top-width: 5px;
+  border-bottom-width: 6px;
+  border-left-width: 9px;
+  border-top-width: 6px;
   margin-left: 2px;
 }
 
@@ -301,22 +354,22 @@
 }
 
 .VoiceMessagePost--preview .VoiceMessagePost__body {
-  display: flex;
-  flex: 0 0 auto;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__scrubberLabel,
-.VoiceMessagePost--preview .VoiceMessagePost__speedControls {
-  display: none;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__meta {
-  gap: 0;
+  align-items: center;
+  display: grid;
+  flex: 1 1 auto;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .VoiceMessagePost--preview .VoiceMessagePost__timeline {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__scrubberLabel:focus-within {
+  border-radius: 4px;
+  outline: 2px solid var(--button-bg, currentColor);
+  outline-offset: 2px;
 }
 
 .VoiceMessagePost--fallback {
