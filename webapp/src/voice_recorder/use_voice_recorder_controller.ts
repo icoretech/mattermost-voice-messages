@@ -1,24 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { VoiceMessagesClientConfig } from "../api/client_config";
+import {
+  loadClientConfig,
+  type VoiceMessagesClientConfig,
+} from "../api/client_config";
 import { uploadVoiceMessage } from "../api/voice_messages";
 import {
   extractWaveformPeaksFromBlob,
   getRenderableWaveformPeaks,
   type WaveformPeaks,
 } from "../audio/waveform";
-import {
-  maxVoiceMessageBytes,
-  maxVoiceMessageDurationMs,
-  minVoiceMessageDurationMs,
-} from "../constants";
-import {
-  isRecordingSupported,
-  selectAudioMimeType,
-} from "../recording/media_recorder";
+import { selectAudioMimeType } from "../recording/media_recorder";
 import {
   type LocalTranscriptionProgress,
   transcribeVoiceMessageBlob,
 } from "../transcription/client_transcription";
+import { recordingLimitError } from "./recording_limits";
+import { useRecordingLifecycle } from "./use_recording_lifecycle";
 
 export type VoiceRecorderDraft = { channelId: string; rootId?: string };
 
@@ -38,6 +35,8 @@ export type ReviewRecording = {
   durationMs: number;
   mimeType: string;
   url: string;
+  limitError: string;
+  stopNotice: string;
   waveform: WaveformPeaks;
 };
 
@@ -45,6 +44,10 @@ export type RecorderController = {
   status: RecorderStatus;
   error: string;
   elapsedMs: number;
+  recordedBytes: number;
+  limits: VoiceMessagesClientConfig;
+  checkingLimits: boolean;
+  recheckRecordingLimits: () => Promise<void>;
   review: ReviewRecording | null;
   recordingSupported: boolean;
   transcript: string;
@@ -72,133 +75,6 @@ function formatTranscriptionProgress(
     case "done":
       return "Transcribing…";
   }
-}
-
-function useRecordingLifecycle(status: RecorderStatus) {
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const startedAtRef = useRef(0);
-  const stoppedDurationMsRef = useRef<number | null>(null);
-  const sessionRef = useRef<AbortController | null>(null);
-  const recordingSupported = isRecordingSupported();
-
-  const abortSession = useCallback(() => {
-    sessionRef.current?.abort();
-    sessionRef.current = null;
-  }, []);
-
-  const beginSession = useCallback(() => {
-    abortSession();
-    const controller = new AbortController();
-    sessionRef.current = controller;
-    return controller.signal;
-  }, [abortSession]);
-
-  const stopStream = useCallback(() => {
-    for (const track of streamRef.current?.getTracks() ?? []) {
-      track.stop();
-    }
-    streamRef.current = null;
-  }, []);
-
-  const resetRecorder = useCallback(() => {
-    recorderRef.current = null;
-    chunksRef.current = [];
-    startedAtRef.current = 0;
-    stoppedDurationMsRef.current = null;
-    setElapsedMs(0);
-  }, []);
-
-  const getElapsedRecordingMs = useCallback(() => {
-    if (startedAtRef.current === 0) {
-      return 0;
-    }
-    return Math.max(0, Date.now() - startedAtRef.current);
-  }, []);
-
-  useEffect(() => {
-    if (status !== "recording") {
-      return undefined;
-    }
-
-    const interval = window.setInterval(() => {
-      setElapsedMs(Date.now() - startedAtRef.current);
-    }, 250);
-
-    return () => window.clearInterval(interval);
-  }, [status]);
-
-  useEffect(() => {
-    return () => {
-      abortSession();
-      const recorder = recorderRef.current;
-      if (recorder) {
-        recorder.onstop = null;
-        recorder.ondataavailable = null;
-        recorder.onerror = null;
-        if (recorder.state !== "inactive") recorder.stop();
-      }
-      stopStream();
-    };
-  }, [abortSession, stopStream]);
-
-  const setStream = useCallback((stream: MediaStream) => {
-    streamRef.current = stream;
-  }, []);
-
-  const getRecorder = useCallback(() => recorderRef.current, []);
-
-  const setRecorder = useCallback((recorder: MediaRecorder) => {
-    recorderRef.current = recorder;
-  }, []);
-
-  const resetChunks = useCallback(() => {
-    chunksRef.current = [];
-  }, []);
-
-  const appendChunk = useCallback((chunk: Blob) => {
-    chunksRef.current.push(chunk);
-  }, []);
-
-  const createBlob = useCallback(
-    (mimeType: string) => new Blob(chunksRef.current, { type: mimeType }),
-    [],
-  );
-
-  const markStarted = useCallback(() => {
-    startedAtRef.current = Date.now();
-    setElapsedMs(0);
-  }, []);
-
-  const captureStoppedDuration = useCallback(() => {
-    stoppedDurationMsRef.current = getElapsedRecordingMs();
-  }, [getElapsedRecordingMs]);
-
-  const getStoppedDurationMs = useCallback(
-    () => stoppedDurationMsRef.current,
-    [],
-  );
-
-  return {
-    elapsedMs,
-    recordingSupported,
-    stopStream,
-    resetRecorder,
-    getElapsedRecordingMs,
-    setStream,
-    getRecorder,
-    setRecorder,
-    resetChunks,
-    appendChunk,
-    createBlob,
-    markStarted,
-    captureStoppedDuration,
-    getStoppedDurationMs,
-    beginSession,
-    abortSession,
-  };
 }
 
 function useTranscriptionLifecycle() {
@@ -289,6 +165,9 @@ export function useVoiceRecorderController(
 ): RecorderController {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [error, setError] = useState("");
+  const [limits, setLimits] = useState(config);
+  const [checkingLimits, setCheckingLimits] = useState(false);
+  const reviewLimitsAbortControllerRef = useRef<AbortController | null>(null);
   const [review, setReview] = useState<ReviewRecording | null>(null);
   const uploadAbortControllerRef = useRef<AbortController | null>(null);
   const reviewURLRef = useRef<string | null>(null);
@@ -296,6 +175,7 @@ export function useVoiceRecorderController(
 
   const {
     elapsedMs,
+    recordedBytes,
     recordingSupported,
     stopStream,
     resetRecorder,
@@ -307,11 +187,12 @@ export function useVoiceRecorderController(
     appendChunk,
     createBlob,
     markStarted,
-    captureStoppedDuration,
     getStoppedDurationMs,
+    stopRecording,
+    getStopNotice,
     beginSession,
     abortSession,
-  } = useRecordingLifecycle(status);
+  } = useRecordingLifecycle();
 
   const {
     transcript,
@@ -338,10 +219,14 @@ export function useVoiceRecorderController(
     return () => {
       releaseReviewURL();
       uploadAbortControllerRef.current?.abort();
+      reviewLimitsAbortControllerRef.current?.abort();
     };
   }, [releaseReviewURL]);
 
   function clearReview() {
+    reviewLimitsAbortControllerRef.current?.abort();
+    reviewLimitsAbortControllerRef.current = null;
+    setCheckingLimits(false);
     releaseReviewURL();
     setReview(null);
   }
@@ -350,11 +235,18 @@ export function useVoiceRecorderController(
     recorder: MediaRecorder,
     selectedMimeType: string | undefined,
     signal: AbortSignal,
+    recordingConfig: VoiceMessagesClientConfig,
   ) {
     if (signal.aborted) return;
     const durationMs = getStoppedDurationMs() ?? getElapsedRecordingMs();
     const mimeType = recorder.mimeType || selectedMimeType || "audio/webm";
     const blob = createBlob(mimeType);
+    const stopNotice = getStopNotice();
+    const limitError = recordingLimitError(
+      blob.size,
+      durationMs,
+      recordingConfig,
+    );
 
     stopStream();
     resetRecorder();
@@ -368,7 +260,7 @@ export function useVoiceRecorderController(
     resetTranscriptionState();
 
     const waveform =
-      (await extractWaveformPeaksFromBlob(blob)) ??
+      (limitError ? null : await extractWaveformPeaksFromBlob(blob)) ??
       getRenderableWaveformPeaks(undefined);
     if (signal.aborted) return;
     const reviewId = reviewSequenceRef.current + 1;
@@ -378,6 +270,8 @@ export function useVoiceRecorderController(
       blob,
       durationMs,
       mimeType,
+      limitError,
+      stopNotice,
       waveform,
       url: URL.createObjectURL(blob),
     };
@@ -386,8 +280,9 @@ export function useVoiceRecorderController(
     setReview(nextReview);
     setStatus("review");
     if (
-      config.clientTranscriptionEnabled &&
-      config.clientTranscriptionAutoStart
+      !limitError &&
+      recordingConfig.clientTranscriptionEnabled &&
+      recordingConfig.clientTranscriptionAutoStart
     ) {
       void startTranscription(nextReview);
     }
@@ -413,7 +308,16 @@ export function useVoiceRecorderController(
     const signal = beginSession();
 
     let stream: MediaStream;
+    let recordingConfig: VoiceMessagesClientConfig;
     try {
+      recordingConfig = await loadClientConfig(signal);
+      if (signal.aborted) return;
+      if (!recordingConfig.voiceMessagesEnabled) {
+        setError("Voice messages are disabled");
+        setStatus("error");
+        return;
+      }
+      setLimits(recordingConfig);
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (recordingError) {
       if (signal.aborted) return;
@@ -452,7 +356,7 @@ export function useVoiceRecorderController(
     resetChunks();
     recorder.ondataavailable = (event) => {
       if (!signal.aborted && event.data.size > 0) {
-        appendChunk(event.data);
+        appendChunk(event.data, recordingConfig);
       }
     };
     recorder.onerror = () => {
@@ -465,12 +369,12 @@ export function useVoiceRecorderController(
       setStatus("error");
     };
     recorder.onstop = () =>
-      void finishRecording(recorder, selectedMimeType, signal);
+      void finishRecording(recorder, selectedMimeType, signal, recordingConfig);
 
     setRecorder(recorder);
-    markStarted();
     try {
-      recorder.start();
+      recorder.start(250);
+      markStarted(recordingConfig);
     } catch (recordingError) {
       abortSession();
       recorder.onstop = null;
@@ -487,24 +391,6 @@ export function useVoiceRecorderController(
       return;
     }
     setStatus("recording");
-  }
-
-  function stopRecording() {
-    const recorder = getRecorder();
-    if (recorder?.state === "recording") {
-      captureStoppedDuration();
-      recorder.stop();
-      return;
-    }
-
-    if (recorder) {
-      return;
-    }
-
-    stopStream();
-    resetRecorder();
-    resetTranscriptionState();
-    setStatus("idle");
   }
 
   function cancelRecording() {
@@ -530,9 +416,7 @@ export function useVoiceRecorderController(
   const startTranscription = useCallback(
     async (targetReview?: ReviewRecording) => {
       const activeReview = targetReview ?? review;
-      if (!config.clientTranscriptionEnabled || !activeReview) {
-        return;
-      }
+      if (!activeReview || activeReview.limitError) return;
 
       const abortController = beginTranscription();
       const reviewId = activeReview.id;
@@ -548,13 +432,33 @@ export function useVoiceRecorderController(
       };
 
       try {
+        const currentConfig = await loadClientConfig(abortController.signal);
+        if (abortController.signal.aborted) return;
+        setLimits(currentConfig);
+        const limitError = recordingLimitError(
+          activeReview.blob.size,
+          activeReview.durationMs,
+          currentConfig,
+        );
+        if (limitError) {
+          setReview({ ...activeReview, limitError });
+          cancelTranscription();
+          return;
+        }
+        if (
+          !currentConfig.voiceMessagesEnabled ||
+          !currentConfig.clientTranscriptionEnabled
+        ) {
+          cancelTranscription();
+          return;
+        }
         const text = await transcribeVoiceMessageBlob(
           activeReview.blob,
           activeReview.mimeType,
           {
-            model: config.clientTranscriptionModel,
-            quantization: config.clientTranscriptionQuantization,
-            language: config.clientTranscriptionLanguage,
+            model: currentConfig.clientTranscriptionModel,
+            quantization: currentConfig.clientTranscriptionQuantization,
+            language: currentConfig.clientTranscriptionLanguage,
             signal: abortController.signal,
             onProgress: (progress) =>
               updateIfCurrent(() =>
@@ -586,12 +490,9 @@ export function useVoiceRecorderController(
     },
     [
       beginTranscription,
+      cancelTranscription,
       clearTranscriptionAbortController,
       completeTranscription,
-      config.clientTranscriptionEnabled,
-      config.clientTranscriptionLanguage,
-      config.clientTranscriptionModel,
-      config.clientTranscriptionQuantization,
       failTranscription,
       review,
       setTranscript,
@@ -599,29 +500,47 @@ export function useVoiceRecorderController(
     ],
   );
 
+  async function recheckRecordingLimits() {
+    if (!review || checkingLimits) return;
+    reviewLimitsAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    reviewLimitsAbortControllerRef.current = controller;
+    setCheckingLimits(true);
+    setError("");
+    try {
+      const currentConfig = await loadClientConfig(controller.signal);
+      if (controller.signal.aborted) return;
+      setLimits(currentConfig);
+      const limitError = currentConfig.voiceMessagesEnabled
+        ? recordingLimitError(
+            review.blob.size,
+            review.durationMs,
+            currentConfig,
+          )
+        : "Voice messages are disabled. Download your recording to keep a copy.";
+      const waveform = limitError
+        ? review.waveform
+        : ((await extractWaveformPeaksFromBlob(review.blob)) ??
+          review.waveform);
+      if (controller.signal.aborted) return;
+      setReview({ ...review, limitError, waveform });
+    } catch (limitError) {
+      if (controller.signal.aborted) return;
+      setError(
+        limitError instanceof Error
+          ? limitError.message
+          : "Could not check recording limits",
+      );
+    } finally {
+      if (reviewLimitsAbortControllerRef.current === controller) {
+        reviewLimitsAbortControllerRef.current = null;
+        if (!controller.signal.aborted) setCheckingLimits(false);
+      }
+    }
+  }
+
   async function sendRecording() {
     if (!review || uploadAbortControllerRef.current) {
-      return;
-    }
-
-    if (review.blob.size === 0) {
-      setError("Recording is empty");
-      setStatus("error");
-      return;
-    }
-
-    if (review.blob.size > maxVoiceMessageBytes) {
-      setError("Voice message is too large");
-      setStatus("error");
-      return;
-    }
-
-    if (
-      review.durationMs < minVoiceMessageDurationMs ||
-      review.durationMs > maxVoiceMessageDurationMs
-    ) {
-      setError("Recording duration is invalid");
-      setStatus("error");
       return;
     }
 
@@ -632,6 +551,24 @@ export function useVoiceRecorderController(
     setError("");
 
     try {
+      const currentConfig = await loadClientConfig(abortController.signal);
+      if (abortController.signal.aborted) return;
+      setLimits(currentConfig);
+      const currentLimitError = recordingLimitError(
+        review.blob.size,
+        review.durationMs,
+        currentConfig,
+      );
+      if (currentLimitError || !currentConfig.voiceMessagesEnabled) {
+        setReview({
+          ...review,
+          limitError:
+            currentLimitError ||
+            "Voice messages are disabled. Download your recording to keep a copy.",
+        });
+        setStatus("review");
+        return;
+      }
       await uploadVoiceMessage({
         blob: review.blob,
         channelId: draft.channelId,
@@ -639,7 +576,9 @@ export function useVoiceRecorderController(
         durationMs: review.durationMs,
         mimeType: review.mimeType,
         waveform: review.waveform,
-        transcript: config.clientTranscriptionEnabled ? transcript : undefined,
+        transcript: currentConfig.clientTranscriptionEnabled
+          ? transcript
+          : undefined,
         signal: abortController.signal,
       });
       if (abortController.signal.aborted) return;
@@ -655,7 +594,7 @@ export function useVoiceRecorderController(
           ? uploadError.message
           : "Could not send voice message",
       );
-      setStatus("error");
+      setStatus("review");
     } finally {
       if (uploadAbortControllerRef.current === abortController) {
         uploadAbortControllerRef.current = null;
@@ -667,6 +606,10 @@ export function useVoiceRecorderController(
     status,
     error,
     elapsedMs,
+    recordedBytes,
+    limits,
+    checkingLimits,
+    recheckRecordingLimits,
     review,
     recordingSupported,
     transcript,

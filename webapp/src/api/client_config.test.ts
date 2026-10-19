@@ -5,6 +5,11 @@ import {
   useVoiceMessagesClientConfig,
 } from "./client_config";
 
+const serverLimits = {
+  max_voice_message_bytes: 102400,
+  max_recording_duration_ms: 3000,
+};
+
 describe("client config", () => {
   beforeEach(() => {
     window.basename = "";
@@ -21,6 +26,7 @@ describe("client config", () => {
       "fetch",
       vi.fn(async () =>
         Response.json({
+          ...serverLimits,
           voice_messages_enabled: false,
           uploaded_audio_preview_enabled: false,
           client_transcription_enabled: true,
@@ -33,6 +39,8 @@ describe("client config", () => {
     );
 
     await expect(loadClientConfig()).resolves.toEqual({
+      maxVoiceMessageBytes: 102400,
+      maxRecordingDurationMs: 3000,
       voiceMessagesEnabled: false,
       uploadedAudioPreviewEnabled: false,
       clientTranscriptionEnabled: true,
@@ -57,6 +65,7 @@ describe("client config", () => {
         "fetch",
         vi.fn(async () =>
           Response.json({
+            ...serverLimits,
             client_transcription_model: model,
             client_transcription_quantization: "q8",
           }),
@@ -75,6 +84,7 @@ describe("client config", () => {
       "fetch",
       vi.fn(async () =>
         Response.json({
+          ...serverLimits,
           voice_messages_enabled: "yes",
           client_transcription_enabled: true,
           client_transcription_model: "unknown",
@@ -86,7 +96,51 @@ describe("client config", () => {
 
     await expect(loadClientConfig()).resolves.toEqual({
       ...defaultClientConfig,
+      maxVoiceMessageBytes: 102400,
+      maxRecordingDurationMs: 3000,
       clientTranscriptionEnabled: true,
+    });
+  });
+
+  it.each([undefined, null, "1024", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects unsafe byte limits %s",
+    async (limit) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json({ ...serverLimits, max_voice_message_bytes: limit }),
+        ),
+      );
+      await expect(loadClientConfig()).rejects.toThrow(
+        "valid recording limits",
+      );
+    },
+  );
+
+  it.each([undefined, null, "1000", -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects unsafe duration limits %s",
+    async (limit) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json({ ...serverLimits, max_recording_duration_ms: limit }),
+        ),
+      );
+      await expect(loadClientConfig()).rejects.toThrow(
+        "valid recording limits",
+      );
+    },
+  );
+
+  it("accepts zero duration as unlimited", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ ...serverLimits, max_recording_duration_ms: 0 }),
+      ),
+    );
+    await expect(loadClientConfig()).resolves.toMatchObject({
+      maxRecordingDurationMs: 0,
     });
   });
 
@@ -104,8 +158,12 @@ describe("client config", () => {
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce(Response.json({ voice_messages_enabled: false }))
-        .mockResolvedValueOnce(Response.json({ voice_messages_enabled: true })),
+        .mockResolvedValueOnce(
+          Response.json({ ...serverLimits, voice_messages_enabled: false }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({ ...serverLimits, voice_messages_enabled: true }),
+        ),
     );
 
     await expect(loadClientConfig()).resolves.toMatchObject({
@@ -118,7 +176,9 @@ describe("client config", () => {
   it("loads configuration into the hook and clears loading state", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ voice_messages_enabled: false })),
+      vi.fn(async () =>
+        Response.json({ ...serverLimits, voice_messages_enabled: false }),
+      ),
     );
     const { result } = renderHook(() => useVoiceMessagesClientConfig());
     expect(result.current.loading).toBe(true);
@@ -141,7 +201,9 @@ describe("client config", () => {
     unmount();
     expect(signal?.aborted).toBe(true);
     await act(async () =>
-      response.resolve(Response.json({ voice_messages_enabled: false })),
+      response.resolve(
+        Response.json({ ...serverLimits, voice_messages_enabled: false }),
+      ),
     );
     expect(result.current.loading).toBe(true);
     expect(result.current.config).toBe(defaultClientConfig);

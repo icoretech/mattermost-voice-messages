@@ -98,6 +98,8 @@ func defaultClientTranscriptionQuantization() string {
 }
 
 type configuration struct {
+	MaxVoiceMessageSizeMB           *int64 `json:"MaxVoiceMessageSizeMB"`
+	MaxRecordingDurationSeconds     *int64 `json:"MaxRecordingDurationSeconds"`
 	EnableVoiceMessages             *bool  `json:"EnableVoiceMessages"`
 	EnableUploadedAudioPreview      *bool  `json:"EnableUploadedAudioPreview"`
 	EnableClientTranscription       *bool  `json:"EnableClientTranscription"`
@@ -108,6 +110,8 @@ type configuration struct {
 }
 
 type clientConfiguration struct {
+	MaxVoiceMessageBytes            int64  `json:"max_voice_message_bytes"`
+	MaxRecordingDurationMS          int64  `json:"max_recording_duration_ms"`
 	VoiceMessagesEnabled            bool   `json:"voice_messages_enabled"`
 	UploadedAudioPreviewEnabled     bool   `json:"uploaded_audio_preview_enabled"`
 	ClientTranscriptionEnabled      bool   `json:"client_transcription_enabled"`
@@ -138,6 +142,8 @@ func (c *configuration) Clone() *configuration {
 	}
 
 	return &configuration{
+		MaxVoiceMessageSizeMB:           cloneInt64Pointer(c.MaxVoiceMessageSizeMB),
+		MaxRecordingDurationSeconds:     cloneInt64Pointer(c.MaxRecordingDurationSeconds),
 		EnableVoiceMessages:             cloneBoolPointer(c.EnableVoiceMessages),
 		EnableUploadedAudioPreview:      cloneBoolPointer(c.EnableUploadedAudioPreview),
 		EnableClientTranscription:       cloneBoolPointer(c.EnableClientTranscription),
@@ -186,6 +192,8 @@ func (c *configuration) clientTranscriptionLanguage() string {
 
 func (c *configuration) clientConfiguration() clientConfiguration {
 	return clientConfiguration{
+		MaxVoiceMessageBytes:            c.maxVoiceMessageSizeMB() * bytesPerMiB,
+		MaxRecordingDurationMS:          c.maxRecordingDurationSeconds() * 1000,
 		VoiceMessagesEnabled:            c.voiceMessagesEnabled(),
 		UploadedAudioPreviewEnabled:     c.uploadedAudioPreviewEnabled(),
 		ClientTranscriptionEnabled:      c.clientTranscriptionEnabled(),
@@ -197,6 +205,9 @@ func (c *configuration) clientConfiguration() clientConfiguration {
 }
 
 func (c *configuration) Validate() error {
+	if err := c.validateVoiceLimits(); err != nil {
+		return err
+	}
 	model := strings.TrimSpace(c.ClientTranscriptionModel)
 	if model != "" && model != "whisper-large-v3" && !isAllowedClientTranscriptionModel(model) {
 		return fmt.Errorf("invalid ClientTranscriptionModel")
@@ -275,7 +286,15 @@ func (p *Plugin) OnConfigurationChange() error {
 }
 
 func (p *Plugin) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
-	config := p.getConfiguration().clientConfiguration()
+	configuration := p.getConfiguration()
+	limits, err := p.voiceLimits(configuration)
+	if err != nil {
+		http.Error(w, "Voice message limits are unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	config := configuration.clientConfiguration()
+	config.MaxVoiceMessageBytes = limits.maxBytes
+	config.MaxRecordingDurationMS = limits.maxDurationMS
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(config); err != nil && p.API != nil {

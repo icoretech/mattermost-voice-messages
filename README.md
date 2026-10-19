@@ -18,7 +18,7 @@ People reading from Mattermost web, desktop, or a mobile browser get the full vo
 ## Features
 
 - Record and send voice messages from Mattermost web and desktop
-- Listen before sending
+- Review recordings with waveform playback before sending
 - Send voice messages in channels and threads
 - Play messages inline on web, desktop, and mobile browser
 - Change playback speed: `0.5x`, `1x`, `1.5x`, and `2x`
@@ -29,7 +29,7 @@ People reading from Mattermost web, desktop, or a mobile browser get the full vo
 
 ## Requirements
 
-- Mattermost Server 8.1+
+- Mattermost Server meeting the minimum version specified in the [plugin manifest](plugin.json)
 - File uploads enabled in Mattermost
 - Users need permission to post messages and upload files in the target channel
 - A modern browser with microphone access for recording
@@ -39,7 +39,7 @@ People reading from Mattermost web, desktop, or a mobile browser get the full vo
 
 The record button is available in Mattermost web, desktop, and mobile browser. Native Mattermost iOS and Android users can listen to received voice messages as audio attachments, but they do not get the plugin's record button.
 
-Voice uploads are limited to 25 MiB and 6 hours. Supported formats are WebM, Ogg, MP4/M4A, MP3, and WAV.
+Recording size and duration limits are configurable in System Console. The voice upload endpoint always respects Mattermost's maximum file size, even when the plugin's size setting is higher. Supported audio formats are WebM, Ogg, MP4/M4A, MP3, and WAV.
 
 ## Installation
 
@@ -71,10 +71,14 @@ mmctl plugin add key assets/signing-key.asc
 2. Click the microphone button next to the composer.
 3. Allow microphone access if the browser asks.
 4. Stop recording when finished.
-5. Review the clip.
+5. Review the clip using playback and the waveform to move through the recording.
 6. If client transcription is enabled, click **Transcribe locally** in the review panel, or wait for transcription to start automatically when the admin has enabled auto-start.
-7. Edit or clear the generated transcript. The transcript is sent as the normal Mattermost message text; if cleared, the voice post is sent without message text.
-8. Click **Send**, or cancel to discard it.
+7. Wait for transcription to finish, then edit or clear the generated text. **Send** is disabled while transcription runs. The transcript is sent as the normal Mattermost message text; if cleared, the voice post is sent without message text.
+8. Click **Send**, or use **Cancel** next to it to discard the recording.
+
+To stop transcription without discarding the recording, use **Cancel** beside the transcription status. If no speech is recognized, click **Try again** or send the audio without a transcript.
+
+The recorder shows the active limits and stops automatically at the duration limit or near the file size limit, leaving room for the browser to finish encoding. The review panel explains why recording stopped. If delayed browser data still pushes a recording over the size limit, download it before discarding it; sending and transcription stay disabled while it exceeds the current limits.
 
 On web, desktop, and mobile browser, sent voice messages show the custom voice player. On native Mattermost mobile apps, they show as regular audio attachments. If a transcript was sent, it appears as normal post text above the attachment.
 
@@ -85,12 +89,18 @@ Configure the plugin from **System Console > Plugins > Mattermost Voice Messages
 | Setting | Default | Effect |
 | --- | --- | --- |
 | `EnableVoiceMessages` | `true` | Shows the microphone recorder and allows voice-message uploads. When disabled, the recorder is hidden and direct upload API calls return `403`. |
+| `MaxVoiceMessageSizeMB` | `25` | Maximum voice recording upload size in MiB. Set `0` to use Mattermost's maximum file size. A positive value can restrict, but never increase, the Mattermost limit. |
+| `MaxRecordingDurationSeconds` | `21600` | Maximum recording duration in seconds. Set `0` to disable the duration limit; the file size limit still applies. |
 | `EnableUploadedAudioPreview` | `true` | Uses the voice-message player for supported audio files uploaded outside the recorder. Existing voice-message posts still render normally. |
 | `EnableClientTranscription` | `false` | Allows users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and cross-origin isolation headers on the Mattermost site. |
 | `ClientTranscriptionAutoStart` | `false` | Starts local transcription automatically after recording stops when client transcription is enabled. When disabled, users click **Transcribe locally** in the review panel. |
 | `ClientTranscriptionModel` | `whisper-tiny` | Selects the browser-whisper model to run in the browser. `whisper-tiny` is the multilingual default. `parakeet-tdt-0.6b-v3` supports 25 languages with automatic detection and requires WebGPU; q8 is recommended (~670 MB). `parakeet-ctc-0.6b` is English-only (~612 MB with q8), without punctuation or timestamps. |
 | `ClientTranscriptionQuantization` | `hybrid` | Selects the model precision passed to browser-whisper. Use `hybrid` for the default Whisper models. Parakeet TDT accepts `hybrid`/`fp16`, `q8`, or `fp32`; `q4` is unsupported. Parakeet CTC accepts `hybrid` (mapped to q8), `q8`, or `fp32`; `q4` and `fp16` are unsupported. |
 | `ClientTranscriptionLanguage` | empty | Optional BCP-47 language tag passed to browser-whisper, for example `en` or `it`. Leave empty for auto-detect. Models without language support ignore this value. |
+
+The recorder refreshes these limits before recording, transcription, and sending. If an admin raises a limit while a recording is blocked, use **Check current limits** in the review panel to try again with the same audio. The server checks the current effective size limit on every upload. Duration limits control recording time; the upload endpoint validates the duration reported by the recorder and does not decode files to measure their duration. Ordinary Mattermost file attachments follow Mattermost's upload rules, independently of the recorder's duration setting.
+
+Recording, waveform preparation, and local transcription use browser memory. Raising upload limits does not guarantee that a device can process recordings of that size locally.
 
 `parakeet-tdt-0.6b-v3` is an optional NVIDIA model with automatic recognition of 25 languages, punctuation, and word timestamps. It requires WebGPU and has no WASM fallback. Use `q8` for a download of about 670 MB. `hybrid` uses the fp16 encoder, just like `fp16`; both need the GPU's `shader-f16` capability and download about 1.26 GB. `fp32` needs about 2.4 GB and can fail at the browser's allocation limits. The model ignores the language setting; `q4` is rejected.
 
@@ -116,7 +126,7 @@ cd webapp
 npm ci
 ```
 
-Development builds require Go 1.27.1+ and Node.js 24+. CI uses Node.js 24.21.0.
+Use the Go version declared in [`go.mod`](go.mod) and the Node.js version configured in the [CI workflow](.github/workflows/ci.yml).
 
 Build the plugin bundle:
 

@@ -62,13 +62,22 @@ class FakeMediaRecorder {
   public mimeType = "audio/webm;codecs=opus";
   public state: RecordingState = "inactive";
   public stopDelayMs = 0;
+  public timeslice: number | undefined;
+  public finalChunk = "voice-data";
+
+  public emitChunk(size: number) {
+    this.ondataavailable?.({
+      data: new Blob([new Uint8Array(size)], { type: this.mimeType }),
+    });
+  }
 
   public constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
     this.mimeType = options?.mimeType ?? "audio/webm";
     FakeMediaRecorder.instances.push(this);
   }
 
-  public start() {
+  public start(timeslice?: number) {
+    this.timeslice = timeslice;
     this.state = "recording";
   }
 
@@ -76,7 +85,7 @@ class FakeMediaRecorder {
     this.state = "inactive";
     const emitStop = () => {
       this.ondataavailable?.({
-        data: new Blob(["voice-data"], { type: this.mimeType }),
+        data: new Blob([this.finalChunk], { type: this.mimeType }),
       });
       this.onstop?.();
     };
@@ -91,6 +100,8 @@ class FakeMediaRecorder {
 }
 
 type ServerClientConfig = {
+  max_voice_message_bytes: number;
+  max_recording_duration_ms: number;
   voice_messages_enabled: boolean;
   uploaded_audio_preview_enabled: boolean;
   client_transcription_enabled: boolean;
@@ -101,6 +112,8 @@ type ServerClientConfig = {
 };
 
 const defaultServerClientConfig: ServerClientConfig = {
+  max_voice_message_bytes: 25 * 1024 * 1024,
+  max_recording_duration_ms: 21600000,
   voice_messages_enabled: true,
   uploaded_audio_preview_enabled: true,
   client_transcription_enabled: false,
@@ -263,7 +276,7 @@ describe("VoiceRecorderAction", () => {
     );
 
     const pendingButton = await screen.findByRole("button", {
-      name: "Requesting microphone permission",
+      name: "Cancel recording",
     });
     expect(pendingButton).toHaveTextContent("");
     expect(pendingButton.querySelector("svg")).toBeInTheDocument();
@@ -299,7 +312,7 @@ describe("VoiceRecorderAction", () => {
     expect(formData.get("duration_ms")).toBe("4000");
   });
 
-  it("keeps the mic icon on the retry control after upload errors", async () => {
+  it("keeps review playback and recovery after upload errors", async () => {
     const track = { stop: vi.fn() };
     installRecorderEnvironment(track, {
       uploadResponse: () =>
@@ -314,10 +327,15 @@ describe("VoiceRecorderAction", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Invalid duration_ms",
     );
-    const retryButton = screen.getByRole("button", {
-      name: "Record voice message",
-    });
-    expect(retryButton.querySelector("svg")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play voice message" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("link", { name: "Download recording" }),
+    ).toHaveAttribute("href", "blob:voice-message");
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeEnabled();
   });
 
   it("stops tracks when recording is cancelled", async () => {
@@ -330,7 +348,7 @@ describe("VoiceRecorderAction", () => {
       await screen.findByRole("button", { name: "Record voice message" }),
     );
     expect(
-      await screen.findByRole("button", { name: "Cancel recording" }),
+      await screen.findByRole("button", { name: "Stop recording" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
 
@@ -720,6 +738,9 @@ describe("VoiceRecorderAction", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Record voice message" }),
     );
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1),
+    );
     unmount();
     await act(async () =>
       permission.resolve({
@@ -844,5 +865,392 @@ describe("VoiceRecorderAction", () => {
     expect(signal?.aborted).toBe(true);
     await act(async () => pendingUpload.resolve(defaultUploadResponse()));
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:voice-message");
+  });
+  it("refreshes limits before microphone access and blocks failed configuration", async () => {
+    installRecorderEnvironment({ stop: vi.fn() });
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    const record = await screen.findByRole("button", {
+      name: "Record voice message",
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response("Settings unavailable", { status: 503 }),
+    );
+    fireEvent.click(record);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Settings unavailable",
+    );
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(FakeMediaRecorder.instances).toHaveLength(0);
+  });
+
+  it("ignores a configuration response after cancellation", async () => {
+    installRecorderEnvironment({ stop: vi.fn() });
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    const record = await screen.findByRole("button", {
+      name: "Record voice message",
+    });
+    const response = Promise.withResolvers<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(response.promise);
+    fireEvent.click(record);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
+    await act(async () =>
+      response.resolve(Response.json(defaultServerClientConfig)),
+    );
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Record voice message" }),
+    ).toBeEnabled();
+  });
+
+  it("uses a changed duration cap without remounting and stops at its deadline despite delayed flush", async () => {
+    const track = { stop: vi.fn() };
+    installRecorderEnvironment(track);
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    const record = await screen.findByRole("button", {
+      name: "Record voice message",
+    });
+    installFetchMock({ config: { max_recording_duration_ms: 3000 } });
+    fireEvent.click(record);
+    await screen.findByRole("button", { name: "Stop recording" });
+    const recorder = FakeMediaRecorder.instances[0];
+    expect(recorder.timeslice).toBe(250);
+    recorder.stopDelayMs = 1000;
+    vi.useFakeTimers();
+    // Restart the recording with fake timers so its own interval is controlled.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
+    await act(async () =>
+      fireEvent.click(
+        screen.getByRole("button", { name: "Record voice message" }),
+      ),
+    );
+    const activeRecorder = FakeMediaRecorder.instances[1];
+    activeRecorder.stopDelayMs = 1000;
+    Date.now = vi.fn(() => 4100);
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(activeRecorder.state).toBe("inactive");
+    expect(track.stop).toHaveBeenCalledTimes(2);
+    Date.now = vi.fn(() => 9000);
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("duration limit");
+    await act(async () =>
+      fireEvent.click(
+        screen.getByRole("button", { name: "Send voice message" }),
+      ),
+    );
+    const form = getUploadFetchCalls()[0][1]?.body;
+    expect(form).toBeInstanceOf(FormData);
+    if (!(form instanceof FormData)) throw new Error("Expected form data");
+    expect(form.get("duration_ms")).toBe("3000");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([50, 51, 600])(
+    "retains every chunk when final flush is %s bytes near a 1000 byte cap",
+    async (flushBytes) => {
+      installRecorderEnvironment(
+        { stop: vi.fn() },
+        {
+          config: {
+            max_voice_message_bytes: 1000,
+            client_transcription_enabled: true,
+            client_transcription_auto_start: true,
+          },
+        },
+      );
+      vi.mocked(extractWaveformPeaksFromBlob).mockClear();
+      render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Record voice message" }),
+      );
+      await screen.findByRole("button", { name: "Stop recording" });
+      const recorder = FakeMediaRecorder.instances[0];
+      recorder.finalChunk = "x".repeat(flushBytes);
+      Date.now = vi.fn(() => 3000);
+      await act(async () => recorder.emitChunk(800));
+      expect(recorder.state).toBe("recording");
+      expect(screen.getByRole("status")).toHaveTextContent("Approaching limit");
+      await act(async () => recorder.emitChunk(150));
+      expect(recorder.state).toBe("inactive");
+      const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0];
+      expect(blob).toBeInstanceOf(Blob);
+      if (!(blob instanceof Blob)) throw new Error("Expected audio blob");
+      expect(blob.size).toBe(950 + flushBytes);
+      if (flushBytes > 50) {
+        expect(extractWaveformPeaksFromBlob).not.toHaveBeenCalled();
+        expect(browserWhisperMock.transcribe).not.toHaveBeenCalled();
+        expect(
+          screen.getByRole("button", { name: "Send voice message" }),
+        ).toBeDisabled();
+        expect(
+          screen.queryByRole("button", {
+            name: "Transcribe voice message locally",
+          }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByRole("link", { name: "Download recording" }),
+        ).toHaveAttribute("href", "blob:voice-message");
+        expect(
+          screen.getByRole("button", { name: "Play voice message" }),
+        ).toBeEnabled();
+        expect(getUploadFetchCalls()).toHaveLength(0);
+      } else {
+        expect(extractWaveformPeaksFromBlob).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      }
+    },
+  );
+
+  it("keeps unlimited recordings active past the previous six hour cap", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      { config: { max_recording_duration_ms: 0 } },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    const record = await screen.findByRole("button", {
+      name: "Record voice message",
+    });
+    vi.useFakeTimers();
+    await act(async () => fireEvent.click(record));
+    Date.now = vi.fn(() => 7 * 3600000);
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(FakeMediaRecorder.instances[0].state).toBe("recording");
+    await act(async () =>
+      fireEvent.click(screen.getByRole("button", { name: "Stop recording" })),
+    );
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeEnabled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("blocks upload and preserves review when an administrator lowers limits after recording", async () => {
+    installRecorderEnvironment({ stop: vi.fn() });
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    await recordAndReview();
+    installFetchMock({ config: { max_voice_message_bytes: 1 } });
+    fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("size limit");
+    expect(getUploadFetchCalls()).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("link", { name: "Download recording" }),
+    ).toHaveAttribute("href", "blob:voice-message");
+  });
+
+  it("blocks transcription when an administrator lowers limits after recording", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      { config: { client_transcription_enabled: true } },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    await recordAndReview();
+    installFetchMock({
+      config: {
+        max_recording_duration_ms: 1000,
+        client_transcription_enabled: true,
+      },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Transcribe voice message locally" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "duration limit",
+    );
+    expect(browserWhisperMock.transcribe).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeDisabled();
+  });
+  it.each([499, 500])(
+    "preserves the 500ms minimum at %sms",
+    async (durationMs) => {
+      installRecorderEnvironment({ stop: vi.fn() });
+      render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Record voice message" }),
+      );
+      await screen.findByRole("button", { name: "Stop recording" });
+      Date.now = vi.fn(() => 1000 + durationMs);
+      fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+      const send = await screen.findByRole("button", {
+        name: "Send voice message",
+      });
+      if (durationMs < 500) expect(send).toBeDisabled();
+      else expect(send).toBeEnabled();
+    },
+  );
+
+  it("preserves a single delayed chunk larger than the cap without decoding it", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      { config: { max_voice_message_bytes: 1000 } },
+    );
+    vi.mocked(extractWaveformPeaksFromBlob).mockClear();
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Record voice message" }),
+    );
+    await screen.findByRole("button", { name: "Stop recording" });
+    Date.now = vi.fn(() => 3000);
+    await act(async () => FakeMediaRecorder.instances[0].emitChunk(1500));
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeDisabled();
+    expect(extractWaveformPeaksFromBlob).not.toHaveBeenCalled();
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0];
+    if (!(blob instanceof Blob)) throw new Error("Expected audio blob");
+    expect(blob.size).toBe(1510);
+  });
+
+  it("prioritizes the duration deadline when a delayed chunk arrives before its timer", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      {
+        config: {
+          max_voice_message_bytes: 1000,
+          max_recording_duration_ms: 3000,
+        },
+      },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Record voice message" }),
+    );
+    await screen.findByRole("button", { name: "Stop recording" });
+    Date.now = vi.fn(() => 4500);
+    await act(async () => FakeMediaRecorder.instances[0].emitChunk(950));
+    expect(screen.getByRole("status")).toHaveTextContent("duration limit");
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const form = getUploadFetchCalls()[0][1]?.body;
+    if (!(form instanceof FormData)) throw new Error("Expected form data");
+    expect(form.get("duration_ms")).toBe("3000");
+  });
+
+  it("clears the recording timer on cancellation and ignores a delayed flush", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      { config: { max_recording_duration_ms: 3000 } },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    const record = await screen.findByRole("button", {
+      name: "Record voice message",
+    });
+    vi.useFakeTimers();
+    await act(async () => fireEvent.click(record));
+    const recorder = FakeMediaRecorder.instances[0];
+    recorder.stopDelayMs = 1000;
+    fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
+    Date.now = vi.fn(() => 999999);
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(vi.getTimerCount()).toBe(0);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Record voice message" }),
+    ).toBeEnabled();
+  });
+  it.each([true, false])(
+    "refreshes the transcription controls between recordings when enabled becomes %s",
+    async (enabled) => {
+      installRecorderEnvironment(
+        { stop: vi.fn() },
+        { config: { client_transcription_enabled: !enabled } },
+      );
+      render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+      await recordAndReview();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
+      installFetchMock({ config: { client_transcription_enabled: enabled } });
+      Date.now = vi.fn(() => 1000);
+      await recordAndReview();
+      const control = screen.queryByRole("button", {
+        name: "Transcribe voice message locally",
+      });
+      if (enabled) expect(control).toBeEnabled();
+      else expect(control).not.toBeInTheDocument();
+    },
+  );
+
+  it("allows a preserved oversized recording after the administrator raises its cap", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      { config: { max_voice_message_bytes: 1000 } },
+    );
+    vi.mocked(extractWaveformPeaksFromBlob).mockClear();
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Record voice message" }),
+    );
+    await screen.findByRole("button", { name: "Stop recording" });
+    Date.now = vi.fn(() => 3000);
+    await act(async () => FakeMediaRecorder.instances[0].emitChunk(1500));
+    expect(extractWaveformPeaksFromBlob).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Send voice message" }),
+    ).toBeDisabled();
+    installFetchMock({ config: { max_voice_message_bytes: 2000 } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check current limits" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Send voice message" }),
+      ).toBeEnabled(),
+    );
+    expect(extractWaveformPeaksFromBlob).toHaveBeenCalledTimes(1);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Send voice message" }));
+    await waitFor(() => expect(getUploadFetchCalls()).toHaveLength(1));
+    const form = getUploadFetchCalls()[0][1]?.body;
+    if (!(form instanceof FormData)) throw new Error("Expected form data");
+    const audio = form.get("audio");
+    if (!(audio instanceof File)) throw new Error("Expected audio file");
+    expect(audio.size).toBe(1510);
+  });
+
+  it("ignores a delayed limit recheck after cancelling the preserved review", async () => {
+    installRecorderEnvironment(
+      { stop: vi.fn() },
+      { config: { max_voice_message_bytes: 1000 } },
+    );
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Record voice message" }),
+    );
+    await screen.findByRole("button", { name: "Stop recording" });
+    Date.now = vi.fn(() => 3000);
+    await act(async () => FakeMediaRecorder.instances[0].emitChunk(1500));
+    const response = Promise.withResolvers<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(response.promise);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check current limits" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
+    await act(async () =>
+      response.resolve(Response.json(defaultServerClientConfig)),
+    );
+    expect(
+      screen.getByRole("button", { name: "Record voice message" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Send voice message" }),
+    ).not.toBeInTheDocument();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:voice-message");
+  });
+  it("shows the configured six hour recording limit as hours", async () => {
+    installRecorderEnvironment({ stop: vi.fn() });
+    render(<VoiceRecorderAction draft={{ channelId: "channel-id" }} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Record voice message" }),
+    );
+    await screen.findByRole("button", { name: "Stop recording" });
+    expect(screen.getByText("0:00 / 6:00:00")).toBeInTheDocument();
   });
 });

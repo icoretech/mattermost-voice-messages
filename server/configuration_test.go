@@ -14,6 +14,8 @@ import (
 
 func defaultClientConfiguration() clientConfiguration {
 	return clientConfiguration{
+		MaxVoiceMessageBytes:            25 * 1024 * 1024,
+		MaxRecordingDurationMS:          21600000,
 		VoiceMessagesEnabled:            true,
 		UploadedAudioPreviewEnabled:     true,
 		ClientTranscriptionEnabled:      false,
@@ -202,6 +204,7 @@ func TestOnConfigurationChangeMigratesLegacyModel(t *testing.T) {
 					ClientTranscriptionLanguage:     " it ",
 				}
 			}).Return(nil).Twice()
+			api.On("GetConfig").Return(testServerConfig(100 * 1024 * 1024)).Once()
 			api.On("LogInfo", mock.Anything, "model", "whisper-large-v3-turbo", "quantization", tc.wantPrecision).Once()
 
 			// When the saved configuration is loaded again by Mattermost.
@@ -215,6 +218,8 @@ func TestOnConfigurationChangeMigratesLegacyModel(t *testing.T) {
 			var response clientConfiguration
 			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 			assert.Equal(t, clientConfiguration{
+				MaxVoiceMessageBytes:            25 * 1024 * 1024,
+				MaxRecordingDurationMS:          21600000,
 				VoiceMessagesEnabled:            false,
 				UploadedAudioPreviewEnabled:     false,
 				ClientTranscriptionEnabled:      true,

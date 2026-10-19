@@ -1,6 +1,11 @@
 import React, { useRef } from "react";
 import { createPortal } from "react-dom";
-import { useVoiceMessagesClientConfig } from "../api/client_config";
+import {
+  useVoiceMessagesClientConfig,
+  type VoiceMessagesClientConfig,
+} from "../api/client_config";
+import { formatAudioTime } from "../audio/format_audio_time";
+import { formatRecordingBytes } from "../voice_recorder/recording_limits";
 import { useComposerActionsTarget } from "../voice_recorder/use_composer_actions_target";
 import {
   type ReviewRecording,
@@ -14,21 +19,14 @@ export type VoiceRecorderActionProps = {
   draft: VoiceRecorderDraft;
 };
 
-function formatElapsedTime(milliseconds: number): string {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function RequestingPermissionButton() {
+function RequestingPermissionButton({ onCancel }: { onCancel: () => void }) {
   return (
     <button
       className="VoiceRecorderAction__button VoiceRecorderAction__button--pending"
-      disabled
+      onClick={onCancel}
       type="button"
-      aria-label="Requesting microphone permission"
-      title="Requesting microphone permission"
+      aria-label="Cancel recording"
+      title="Loading settings or waiting for microphone. Click to cancel."
     >
       <MicIcon />
     </button>
@@ -37,20 +35,39 @@ function RequestingPermissionButton() {
 
 function RecordingPanel({
   elapsedMs,
+  recordedBytes,
+  limits,
   onCancel,
   onStop,
 }: {
   elapsedMs: number;
+  recordedBytes: number;
+  limits: VoiceMessagesClientConfig;
   onCancel: () => void;
   onStop: () => void;
 }) {
   return (
     <div className="VoiceRecorderAction VoiceRecorderAction__panel VoiceRecorderAction__panel--recording">
       <span className="VoiceRecorderAction__recordingDot" aria-hidden="true" />
-      <span className="VoiceRecorderAction__timer" aria-live="polite">
-        {formatElapsedTime(elapsedMs)}
+      <span className="VoiceRecorderAction__recordingProgress">
+        <span className="VoiceRecorderAction__timer">
+          {formatAudioTime(elapsedMs)}
+          {limits.maxRecordingDurationMs > 0
+            ? ` / ${formatAudioTime(limits.maxRecordingDurationMs)}`
+            : " / unlimited"}
+        </span>
+        <span className="VoiceRecorderAction__limits">
+          {formatRecordingBytes(recordedBytes)} /{" "}
+          {formatRecordingBytes(limits.maxVoiceMessageBytes)}
+        </span>
+        {recordedBytes >= limits.maxVoiceMessageBytes * 0.8 ||
+        (limits.maxRecordingDurationMs > 0 &&
+          elapsedMs >= limits.maxRecordingDurationMs * 0.8) ? (
+          <span className="VoiceRecorderAction__limits" role="status">
+            Approaching limit · stopping soon
+          </span>
+        ) : null}
       </span>
-      <span className="VoiceRecorderAction__recordingLabel">Recording</span>
       <button
         className="VoiceRecorderAction__iconButton VoiceRecorderAction__iconButton--stop"
         type="button"
@@ -69,7 +86,56 @@ function RecordingPanel({
   );
 }
 
+function ReviewNotices({
+  review,
+  error,
+  checkingLimits,
+  onRecheckLimits,
+}: {
+  checkingLimits: boolean;
+  onRecheckLimits: () => void;
+  review: ReviewRecording;
+  error: string;
+}) {
+  return (
+    <>
+      {review.stopNotice ? (
+        <span className="VoiceRecorderAction__limitNotice" role="status">
+          {review.stopNotice}
+        </span>
+      ) : null}
+      {review.limitError || error ? (
+        <span className="VoiceRecorderAction__limitNotice" role="alert">
+          {error || review.limitError}
+        </span>
+      ) : null}
+      {review.limitError ? (
+        <button
+          className="VoiceRecorderAction__transcriptionButton"
+          type="button"
+          disabled={checkingLimits}
+          onClick={onRecheckLimits}
+        >
+          {checkingLimits ? "Checking limits…" : "Check current limits"}
+        </button>
+      ) : null}
+      {review.limitError || error ? (
+        <a
+          className="VoiceRecorderAction__transcriptionButton"
+          href={review.url}
+          download={`voice-message.${review.mimeType.includes("mp4") ? "mp4" : review.mimeType.includes("ogg") ? "ogg" : "webm"}`}
+        >
+          Download recording
+        </a>
+      ) : null}
+    </>
+  );
+}
+
 function ReviewPanel({
+  checkingLimits,
+  onRecheckLimits,
+  error,
   clientTranscriptionEnabled,
   onCancel,
   onCancelTranscription,
@@ -82,6 +148,9 @@ function ReviewPanel({
   transcriptionProgressLabel,
   transcriptionStatus,
 }: {
+  checkingLimits: boolean;
+  onRecheckLimits: () => void;
+  error: string;
   clientTranscriptionEnabled: boolean;
   onCancel: () => void;
   onCancelTranscription: () => void;
@@ -103,7 +172,13 @@ function ReviewPanel({
         waveform={review.waveform}
         variant="preview"
       />
-      {clientTranscriptionEnabled ? (
+      <ReviewNotices
+        review={review}
+        error={error}
+        checkingLimits={checkingLimits}
+        onRecheckLimits={onRecheckLimits}
+      />
+      {clientTranscriptionEnabled && !review.limitError ? (
         <div className="VoiceRecorderAction__transcription">
           {transcriptionStatus === "transcribing" ? (
             <div className="VoiceRecorderAction__transcriptionStatus VoiceRecorderAction__transcriptionStatus--busy">
@@ -188,7 +263,9 @@ function ReviewPanel({
         </button>
         <button
           className="VoiceRecorderAction__sendButton"
-          disabled={transcriptionStatus === "transcribing"}
+          disabled={
+            Boolean(review.limitError) || transcriptionStatus === "transcribing"
+          }
           type="button"
           aria-label="Send voice message"
           title="Send voice message"
@@ -293,12 +370,16 @@ function VoiceRecorderSession({ draft }: VoiceRecorderActionProps) {
   let content: React.ReactNode;
   switch (controller.status) {
     case "requesting-permission":
-      content = <RequestingPermissionButton />;
+      content = (
+        <RequestingPermissionButton onCancel={controller.cancelRecording} />
+      );
       break;
     case "recording":
       content = (
         <RecordingPanel
           elapsedMs={controller.elapsedMs}
+          recordedBytes={controller.recordedBytes}
+          limits={controller.limits}
           onCancel={controller.cancelRecording}
           onStop={controller.stopRecording}
         />
@@ -307,7 +388,12 @@ function VoiceRecorderSession({ draft }: VoiceRecorderActionProps) {
     case "review":
       content = controller.review ? (
         <ReviewPanel
-          clientTranscriptionEnabled={config.clientTranscriptionEnabled}
+          error={controller.error}
+          checkingLimits={controller.checkingLimits}
+          onRecheckLimits={() => void controller.recheckRecordingLimits()}
+          clientTranscriptionEnabled={
+            controller.limits.clientTranscriptionEnabled
+          }
           review={controller.review}
           transcript={controller.transcript}
           transcriptionStatus={controller.transcriptionStatus}

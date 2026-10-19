@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/mattermost/mattermost/server/public/plugin/plugintest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +44,10 @@ func TestMattermostAuthRequiredPassesAuthenticatedRequest(t *testing.T) {
 }
 
 func TestServeHTTPRoutesConfigBehindMattermostAuth(t *testing.T) {
+	api := &plugintest.API{}
+	api.On("GetConfig").Return(testServerConfig(100 * bytesPerMiB)).Once()
 	p := &Plugin{}
+	p.SetAPI(api)
 	p.setConfiguration(&configuration{
 		EnableVoiceMessages:       new(false),
 		EnableClientTranscription: new(true),

@@ -7,6 +7,8 @@ import {
 import { getSiteBasePath } from "./site_base_path";
 
 export type VoiceMessagesClientConfig = {
+  maxVoiceMessageBytes: number;
+  maxRecordingDurationMs: number;
   voiceMessagesEnabled: boolean;
   uploadedAudioPreviewEnabled: boolean;
   clientTranscriptionEnabled: boolean;
@@ -17,6 +19,8 @@ export type VoiceMessagesClientConfig = {
 };
 
 type ServerVoiceMessagesClientConfig = {
+  max_voice_message_bytes?: unknown;
+  max_recording_duration_ms?: unknown;
   voice_messages_enabled?: unknown;
   uploaded_audio_preview_enabled?: unknown;
   client_transcription_enabled?: unknown;
@@ -27,6 +31,8 @@ type ServerVoiceMessagesClientConfig = {
 };
 
 export const defaultClientConfig: VoiceMessagesClientConfig = {
+  maxVoiceMessageBytes: 0,
+  maxRecordingDurationMs: 0,
   voiceMessagesEnabled: true,
   uploadedAudioPreviewEnabled: true,
   clientTranscriptionEnabled: false,
@@ -70,10 +76,29 @@ function languageOrDefault(value: unknown): string {
     : defaultClientConfig.clientTranscriptionLanguage;
 }
 
+class InvalidRecordingLimitsError extends Error {
+  constructor() {
+    super("Could not load valid recording limits. Try again.");
+  }
+}
+
+function parseLimit(value: unknown, minimum: number): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < minimum
+  ) {
+    throw new InvalidRecordingLimitsError();
+  }
+  return value;
+}
+
 function mapClientConfig(
   payload: ServerVoiceMessagesClientConfig,
 ): VoiceMessagesClientConfig {
   return {
+    maxVoiceMessageBytes: parseLimit(payload.max_voice_message_bytes, 1),
+    maxRecordingDurationMs: parseLimit(payload.max_recording_duration_ms, 0),
     voiceMessagesEnabled: booleanOrDefault(
       payload.voice_messages_enabled,
       defaultClientConfig.voiceMessagesEnabled,
@@ -109,6 +134,7 @@ export function loadClientConfig(
     `${getSiteBasePath()}/plugins/ch.icorete.mattermost-voice-messages/api/v1/config`,
     {
       credentials: "same-origin",
+      cache: "no-store",
       headers: { "X-Requested-With": "XMLHttpRequest" },
       signal,
     },

@@ -543,3 +543,20 @@
     transform: rotate(360deg);
   }
 }
+
+.VoiceRecorderAction__recordingProgress {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+.VoiceRecorderAction__limits {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(var(--center-channel-color-rgb), 0.72);
+}
+.VoiceRecorderAction__limitNotice {
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}

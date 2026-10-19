@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const maxVoiceMessageBytes = defaultMaxVoiceMessageSizeMB * bytesPerMiB
+
 type voiceMessageUploadContract struct {
 	AudioField          string            `json:"audio_field"`
 	FileName            string            `json:"file_name"`
@@ -253,6 +255,7 @@ func TestHandleCreateVoiceMessageRejectsUnavailableChannels(t *testing.T) {
 	for _, scenario := range []string{"archived", "missing", "fetch error"} {
 		t.Run(scenario, func(t *testing.T) {
 			api := &plugintest.API{}
+			api.On("GetConfig").Return(testServerConfig(100 * 1024 * 1024)).Once()
 			p := &Plugin{}
 			p.SetAPI(api)
 			p.router = p.initRouter()
@@ -268,7 +271,7 @@ func TestHandleCreateVoiceMessageRejectsUnavailableChannels(t *testing.T) {
 			case "fetch error":
 				api.On("GetChannel", channelID).Return((*model.Channel)(nil), model.NewAppError("GetChannel", "channel.not_found", nil, "", http.StatusNotFound))
 			}
-			req := newVoiceMultipartRequest(t, map[string]string{"channel_id": channelID}, "voice.webm", "audio/webm", validWebMAudioBytes())
+			req := newVoiceMultipartRequest(t, map[string]string{"channel_id": channelID, "duration_ms": "1"}, "voice.webm", "audio/webm", validWebMAudioBytes())
 			req.Header.Set("Mattermost-User-ID", userID)
 			rec := httptest.NewRecorder()
 			p.ServeHTTP(nil, rec, req)
@@ -398,7 +401,11 @@ func TestHandleGetConfigRejectsMissingUser(t *testing.T) {
 }
 
 func TestHandleGetConfigReturnsEffectiveDefaults(t *testing.T) {
-	p := &Plugin{router: (&Plugin{}).initRouter()}
+	api := &plugintest.API{}
+	api.On("GetConfig").Return(testServerConfig(100 * 1024 * 1024)).Once()
+	p := &Plugin{}
+	p.SetAPI(api)
+	p.router = p.initRouter()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/config", nil)
 	req.Header.Set("Mattermost-User-ID", model.NewId())
 	rec := httptest.NewRecorder()
@@ -441,6 +448,7 @@ func TestHandleCreateVoiceMessageRejectsDisabledVoiceMessages(t *testing.T) {
 }
 func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 	api := &plugintest.API{}
+	api.On("GetConfig").Return(testServerConfig(100 * 1024 * 1024)).Once()
 	p := &Plugin{}
 	p.SetAPI(api)
 	p.router = p.initRouter()
@@ -496,6 +504,7 @@ func TestHandleCreateVoiceMessageUploadsFileAndCreatesPost(t *testing.T) {
 
 func TestHandleCreateVoiceMessageStoresTranscriptWhenEnabled(t *testing.T) {
 	api := &plugintest.API{}
+	api.On("GetConfig").Return(testServerConfig(100 * 1024 * 1024)).Once()
 	p := &Plugin{}
 	p.SetAPI(api)
 	p.setConfiguration(&configuration{EnableClientTranscription: new(true)})
@@ -530,6 +539,7 @@ func TestHandleCreateVoiceMessageStoresTranscriptWhenEnabled(t *testing.T) {
 
 func TestHandleCreateVoiceMessageIgnoresTranscriptWhenDisabled(t *testing.T) {
 	api := &plugintest.API{}
+	api.On("GetConfig").Return(testServerConfig(100 * 1024 * 1024)).Once()
 	p := &Plugin{}
 	p.SetAPI(api)
 	p.setConfiguration(&configuration{EnableClientTranscription: new(false)})

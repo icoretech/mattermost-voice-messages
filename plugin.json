@@ -31,6 +31,20 @@
                 "default": true
             },
             {
+                "key": "MaxVoiceMessageSizeMB",
+                "display_name": "Maximum Voice Message Size (MiB)",
+                "type": "number",
+                "help_text": "Maximum size of recordings sent through the voice recorder. Set 0 to use Mattermost's maximum file size. A positive value can further restrict that limit. Uploaded voice messages cannot exceed the Mattermost file size limit.",
+                "default": 25
+            },
+            {
+                "key": "MaxRecordingDurationSeconds",
+                "display_name": "Maximum Recording Duration (seconds)",
+                "type": "number",
+                "help_text": "Stop recording after this many seconds. Set 0 for no duration limit. The file size limit still applies. This controls the plugin recorder; it does not measure the duration of files uploaded outside it.",
+                "default": 21600
+            },
+            {
                 "key": "EnableUploadedAudioPreview",
                 "display_name": "Enable Uploaded Audio Preview",
                 "type": "bool",

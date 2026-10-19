@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,9 +11,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/model"
 )
 
-const maxVoiceMessageBytes = 25 * 1024 * 1024
 const multipartOverheadBytes = 1 * 1024 * 1024
-const maxVoiceMessageDurationMS = 6 * 60 * 60 * 1000
 const voiceWaveformBarCount = 24
 
 type voiceMessageRequest struct {
@@ -56,10 +55,20 @@ func (p *Plugin) handleCreateVoiceMessage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxVoiceMessageBytes+multipartOverheadBytes)
-	req, handlerErr := parseVoiceMessageRequest(r, maxVoiceMessageBytes, configuration.clientTranscriptionEnabled())
+	limits, err := p.voiceLimits(configuration)
+	if err != nil {
+		http.Error(w, "Voice message limits are unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limits.maxBytes+multipartOverheadBytes)
+	req, handlerErr := parseVoiceMessageRequest(r, limits.maxBytes, configuration.clientTranscriptionEnabled())
 	if handlerErr != nil {
 		http.Error(w, handlerErr.message, handlerErr.status)
+		return
+	}
+
+	if limits.maxDurationMS > 0 && (req.durationMS <= 0 || req.durationMS > limits.maxDurationMS) {
+		http.Error(w, "duration_ms must be positive and within the recording duration limit", http.StatusBadRequest)
 		return
 	}
 
@@ -133,7 +142,7 @@ func parseVoiceMessageRequest(r *http.Request, maxBytes int64, allowTranscript b
 		}
 	}()
 	if err := r.ParseMultipartForm(multipartOverheadBytes); err != nil {
-		if strings.Contains(err.Error(), "http: request body too large") {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			return voiceMessageRequest{}, &handlerError{message: "Voice message too large", status: http.StatusRequestEntityTooLarge}
 		}
 		return voiceMessageRequest{}, &handlerError{message: "Invalid multipart form", status: http.StatusBadRequest}
@@ -174,7 +183,7 @@ func parseVoiceMessageFormFields(r *http.Request, allowTranscript bool) (voiceMe
 	durationMS := int64(0)
 	if durationValue := r.FormValue("duration_ms"); durationValue != "" {
 		parsed, err := strconv.ParseInt(durationValue, 10, 64)
-		if err != nil || parsed < 0 || parsed > maxVoiceMessageDurationMS {
+		if err != nil || parsed < 0 || parsed > maxSafeJSONInteger {
 			return voiceMessageFormFields{}, &handlerError{message: "Invalid duration_ms", status: http.StatusBadRequest}
 		}
 		durationMS = parsed
