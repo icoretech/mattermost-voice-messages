@@ -1,4 +1,5 @@
 import type { Post } from "@mattermost/types/posts";
+import { ProjectLinks } from "../components/project_links";
 import { VoiceFilePreviewOverride } from "../components/voice_file_preview_override";
 import { VoicePostComponent } from "../components/voice_post";
 import { createVoicePostAttachmentComponent } from "../components/voice_post_attachment";
@@ -20,6 +21,9 @@ type MattermostStore = {
 };
 class VoiceMessagesPlugin {
   public initialize(registry: PluginRegistry, store?: MattermostStore) {
+    registry.registerAdminConsoleCustomSetting("ProjectLinks", ProjectLinks, {
+      showTitle: false,
+    });
     registry.registerPostEditorActionComponent(VoiceRecorderAction);
     // Keep rendering historical custom post types; new mobile-safe voice messages render through file attachments.
     registry.registerPostTypeComponent(legacyVoicePostType, VoicePostComponent);

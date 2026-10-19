@@ -20,9 +20,16 @@
         "bundle_path": "webapp/dist/main.js"
     },
     "settings_schema": {
-        "header": "Follow on X: [@icoretech_inc](https://x.com/icoretech_inc) | Star on GitHub: [icoretech/mattermost-voice-messages](https://github.com/icoretech/mattermost-voice-messages)",
+        "header": "",
         "footer": "Client transcription runs in the user's browser. Audio is not sent to this plugin server for transcription.",
         "settings": [
+            {
+                "key": "ProjectLinks",
+                "display_name": "Project links",
+                "type": "custom",
+                "help_text": "",
+                "default": ""
+            },
             {
                 "key": "EnableVoiceMessages",
                 "display_name": "Enable Voice Messages",
