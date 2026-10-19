@@ -15,6 +15,8 @@ People reading from Mattermost web, desktop, or a mobile browser get the full vo
   <img src=".github/assets/screenshot.png" alt="Mattermost Voice Messages screenshot" width="838" />
 </p>
 
+Follow [@icoretech_inc on X](https://x.com/icoretech_inc) for product updates. If this plugin is useful to your team, [star the repository on GitHub](https://github.com/icoretech/mattermost-voice-messages).
+
 ## Features
 
 - Record and send voice messages from Mattermost web and desktop
