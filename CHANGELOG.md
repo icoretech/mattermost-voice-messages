@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.3.0](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.2...v0.3.0) (2026-10-19)
+
+
+### Features
+
+* configure voice recording size and duration limits ([297a381](https://github.com/icoretech/mattermost-voice-messages/commit/297a381b0a6a914567026ea332e94ef11b210e76))
+
+
+### Bug Fixes
+
+* keep model credits out of the recording popover ([e75db40](https://github.com/icoretech/mattermost-voice-messages/commit/e75db4058a625de200db059ebb21121c6d0a91ae))
+* stabilize recording preview and transcription feedback ([c0fd68d](https://github.com/icoretech/mattermost-voice-messages/commit/c0fd68de65633ca4817e6f142ce4df4cdc72a692))
+* transcribe parakeet recordings without silence padding ([776563a](https://github.com/icoretech/mattermost-voice-messages/commit/776563aa753c97e16d2f2fb35840c064c60094f0))
+
+
+### Dependencies
+
+* update dependency jsdom to v30.1.3 ([#35](https://github.com/icoretech/mattermost-voice-messages/issues/35)) ([b372ffa](https://github.com/icoretech/mattermost-voice-messages/commit/b372ffaf04a2a7aba00b7c26587e60e292eceb8e))
+* update dependency node to v24.22.0 ([#34](https://github.com/icoretech/mattermost-voice-messages/issues/34)) ([5696b10](https://github.com/icoretech/mattermost-voice-messages/commit/5696b10263c14718acb3d98f964d8b1e2138e277))
+* update dependency sass-embedded to v1.105.2 ([#37](https://github.com/icoretech/mattermost-voice-messages/issues/37)) ([fab38f4](https://github.com/icoretech/mattermost-voice-messages/commit/fab38f4a42524bfbfc8970c917007c530bd3a65c))
+* update dependency vitest to v5.0.5 ([#36](https://github.com/icoretech/mattermost-voice-messages/issues/36)) ([ee2496c](https://github.com/icoretech/mattermost-voice-messages/commit/ee2496cd44cc3a32a1b4d863ac865d05612cc027))
+* update react-ecosystem to v19.3.1 ([#32](https://github.com/icoretech/mattermost-voice-messages/issues/32)) ([addb84d](https://github.com/icoretech/mattermost-voice-messages/commit/addb84d276b58fa4b13c6625ca6d5dfab1b477d9))
+* upgrade browser-whisper to v2 with model migration ([2573baf](https://github.com/icoretech/mattermost-voice-messages/commit/2573baf8fa9e1a78f5b292909881d3d02ee5885f))
+
+
+### Documentation
+
+* add product update and repository links ([154efd0](https://github.com/icoretech/mattermost-voice-messages/commit/154efd0802e36500263e3d3b1a9d5d78c63fe9d4))
+
+
+### Miscellaneous Chores
+
+* release 0.3.0 ([3c3e4b8](https://github.com/icoretech/mattermost-voice-messages/commit/3c3e4b83d0714e4a59ee5e40087a7ae5c6a17bc9))
+
 ## [0.2.2](https://github.com/icoretech/mattermost-voice-messages/compare/v0.2.1...v0.2.2) (2026-10-13)
 
 
