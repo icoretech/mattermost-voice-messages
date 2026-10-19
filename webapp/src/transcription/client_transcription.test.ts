@@ -5,14 +5,17 @@ import { transcribeVoiceMessageBlob } from "./client_transcription";
 const cancel = vi.fn();
 const dispose = vi.fn();
 const transcribe = vi.fn();
+const transcribePCM = vi.fn();
 
 vi.mock("browser-whisper", async (importOriginal) => ({
   ...(await importOriginal<typeof import("browser-whisper")>()),
   BrowserWhisper: vi.fn(function BrowserWhisperMock(this: {
     transcribe: typeof transcribe;
+    transcribePCM: typeof transcribePCM;
     dispose: typeof dispose;
   }) {
     this.transcribe = transcribe;
+    this.transcribePCM = transcribePCM;
     this.dispose = dispose;
   }),
 }));
@@ -23,6 +26,23 @@ describe("client transcription", () => {
     cancel.mockReset();
     dispose.mockReset();
     transcribe.mockReset();
+    transcribePCM
+      .mockReset()
+      .mockReturnValue({ collect: async () => [], cancel });
+    vi.stubGlobal(
+      "AudioContext",
+      class {
+        decodeAudioData = async () => ({
+          length: 1,
+          numberOfChannels: 1,
+          getChannelData: () => new Float32Array([0.5]),
+        });
+        close = async () => undefined;
+      },
+    );
+    vi.spyOn(Blob.prototype, "arrayBuffer").mockResolvedValue(
+      new ArrayBuffer(0),
+    );
     Object.defineProperty(globalThis, "crossOriginIsolated", {
       configurable: true,
       value: true,
