@@ -11,14 +11,6 @@
           "type": "json",
           "path": "plugin.json",
           "jsonpath": "$.version"
-        },
-        {
-          "type": "generic",
-          "path": "server/manifest.go"
-        },
-        {
-          "type": "generic",
-          "path": "webapp/src/manifest.ts"
         }
       ],
       "changelog-sections": [

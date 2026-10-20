@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: ${{ github.event_name == 'push' }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -29,7 +29,7 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   build-and-upload:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: release-please
     if: ${{ always() && ((github.event_name == 'push' && needs.release-please.outputs.release_created == 'true') || github.event_name == 'workflow_dispatch') }}
     steps:

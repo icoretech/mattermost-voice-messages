@@ -8,7 +8,7 @@ on:
 
 jobs:
   server:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -20,7 +20,7 @@ jobs:
       - run: go test -race ./build/... ./server/...
 
   webapp:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -40,7 +40,7 @@ jobs:
       - run: cd webapp && npm run build
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [server, webapp]
     steps:
       - uses: actions/checkout@v7
