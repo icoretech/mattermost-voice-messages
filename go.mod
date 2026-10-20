@@ -1,6 +1,6 @@
 module github.com/icoretech/mattermost-voice-messages
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/gorilla/mux v1.8.1
