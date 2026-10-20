@@ -1,5 +1,6 @@
 import type { FileInfo } from "@mattermost/types/files";
 import type { Post } from "@mattermost/types/posts";
+import { getCsrfToken } from "./csrf_token";
 import { getSiteBasePath } from "./site_base_path";
 
 export type UploadVoiceMessageInput = {
@@ -44,13 +45,24 @@ export async function uploadVoiceMessage(
     formData.append("transcript", transcript);
   }
 
+  // Without X-CSRF-Token, Mattermost reads the request body to look for a
+  // form token and caps it at ServiceSettings.MaximumPayloadSizeBytes
+  // (300 KB by default), rejecting longer recordings with 413.
+  const headers: Record<string, string> = {
+    "X-Requested-With": "XMLHttpRequest",
+  };
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+
   const response = await fetch(
     `${getSiteBasePath()}/plugins/ch.icorete.mattermost-voice-messages/api/v1/voice-messages`,
     {
       method: "POST",
       body: formData,
       credentials: "same-origin",
-      headers: { "X-Requested-With": "XMLHttpRequest" },
+      headers,
       signal: input.signal,
     },
   );

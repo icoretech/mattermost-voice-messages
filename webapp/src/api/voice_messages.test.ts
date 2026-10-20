@@ -19,23 +19,28 @@ function loadUploadContract(): VoiceMessageUploadContract {
   return uploadContract as VoiceMessageUploadContract;
 }
 
+function stubCreatedUpload() {
+  const fetchMock = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          post: { id: "post-id" },
+          file_info: { id: "file-id" },
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 201,
+        },
+      ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 describe("voice message upload contract", () => {
   it("emits the multipart field map accepted by the server", async () => {
     const contract = loadUploadContract();
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(
-          JSON.stringify({
-            post: { id: "post-id" },
-            file_info: { id: "file-id" },
-          }),
-          {
-            headers: { "Content-Type": "application/json" },
-            status: 201,
-          },
-        ),
-    );
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = stubCreatedUpload();
 
     try {
       await uploadVoiceMessage({
@@ -71,5 +76,49 @@ describe("voice message upload contract", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("voice message upload CSRF header", () => {
+  const upload = () =>
+    uploadVoiceMessage({
+      blob: new Blob(["abc"], { type: "audio/webm" }),
+      channelId: "channel-id",
+      durationMs: 1000,
+      mimeType: "audio/webm",
+    });
+
+  const sentHeaders = (fetchMock: ReturnType<typeof stubCreatedUpload>) => {
+    const [, init] = fetchMock.mock.calls[0];
+    return init?.headers as Record<string, string>;
+  };
+
+  afterEach(() => {
+    // biome-ignore lint/suspicious/noDocumentCookie: jsdom test cookie cleanup.
+    document.cookie = "MMCSRF=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the session CSRF token so Mattermost does not cap the body at its payload limit", async () => {
+    // biome-ignore lint/suspicious/noDocumentCookie: jsdom test cookie setup.
+    document.cookie = "MMCSRF=csrf-token";
+    const fetchMock = stubCreatedUpload();
+
+    await upload();
+
+    expect(sentHeaders(fetchMock)).toEqual({
+      "X-CSRF-Token": "csrf-token",
+      "X-Requested-With": "XMLHttpRequest",
+    });
+  });
+
+  it("omits the header when the session has no CSRF cookie", async () => {
+    const fetchMock = stubCreatedUpload();
+
+    await upload();
+
+    expect(sentHeaders(fetchMock)).toEqual({
+      "X-Requested-With": "XMLHttpRequest",
+    });
   });
 });
