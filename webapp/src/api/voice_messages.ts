@@ -18,6 +18,16 @@ export type UploadVoiceMessageResponse = {
   file_info: FileInfo;
 };
 
+function getCsrfToken(): string {
+  for (const cookie of document.cookie.split(";")) {
+    const trimmed = cookie.trim();
+    if (trimmed.startsWith("MMCSRF=")) {
+      return trimmed.slice("MMCSRF=".length);
+    }
+  }
+  return "";
+}
+
 export async function uploadVoiceMessage(
   input: UploadVoiceMessageInput,
 ): Promise<UploadVoiceMessageResponse> {
@@ -44,13 +54,23 @@ export async function uploadVoiceMessage(
     formData.append("transcript", transcript);
   }
 
+  // A session token prevents Mattermost's CSRF fallback from reading and
+  // limiting the multipart body before the plugin's upload limits apply.
+  const headers: Record<string, string> = {
+    "X-Requested-With": "XMLHttpRequest",
+  };
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+
   const response = await fetch(
     `${getSiteBasePath()}/plugins/ch.icorete.mattermost-voice-messages/api/v1/voice-messages`,
     {
       method: "POST",
       body: formData,
       credentials: "same-origin",
-      headers: { "X-Requested-With": "XMLHttpRequest" },
+      headers,
       signal: input.signal,
     },
   );

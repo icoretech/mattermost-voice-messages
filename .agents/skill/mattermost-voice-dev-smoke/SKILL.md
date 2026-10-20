@@ -117,6 +117,14 @@ For transcription acceptance, use spoken audio and assert recognizable words fro
 
 Keep the browser origin and Mattermost SiteURL aligned when validating websocket behavior. An alternate local proxy port can correctly isolate the document but fail the server's websocket origin check; verify the real public origin separately and do not attribute that mismatch to the plugin.
 
+## Cookie-authenticated upload regression
+
+Exercise browser session cookies when checking upload limits. The sample-post helper authenticates with a bearer token, which bypasses Mattermost's cookie-session CSRF middleware and cannot reproduce its request-body limit.
+
+On Mattermost 12.0.0 with the default `ServiceSettings.MaximumPayloadSizeBytes` of `300000`, compare a small valid audio upload with a valid audio upload whose multipart body exceeds `300512` bytes. With session cookies and only `X-Requested-With: XMLHttpRequest`, the small upload succeeds and the larger upload returns `413` before the plugin runs. With the same cookies and the current raw `MMCSRF` cookie value in `X-CSRF-Token`, the larger upload must succeed and produce a playable attachment. Verify the actual `uploadVoiceMessage` frontend path as well as direct requests; a manually added header alone does not verify the webapp fix.
+
+In an isolated test instance, enable `ServiceSettings.ExperimentalStrictCSRFEnforcement` and verify that an invalid CSRF token is rejected while a valid token still succeeds, then restore the setting. The default non-strict mode accepts the legacy `X-Requested-With` fallback even with a mismatched token. Also check that plugin and Mattermost file-size limits still reject oversized audio with a valid token. Keep credentials out of recorded evidence and retain the configured upload limits rather than raising them to make the smoke pass.
+
 ## Mobile emulator smoke checklist
 
 Native Mattermost mobile apps do not load this plugin's webapp bundle. Expected native behavior: the plugin microphone button is absent, and voice messages appear as ordinary posts with audio attachments. Mobile web still loads the plugin UI and should show the custom player.
