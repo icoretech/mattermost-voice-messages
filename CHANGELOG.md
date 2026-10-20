@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.2](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.1...v0.3.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* include session CSRF token in voice uploads ([5c166de](https://github.com/icoretech/mattermost-voice-messages/commit/5c166de69f4b9f32199fa4a76f1b20495802b426))
+
+
+### Dependencies
+
+* update go module directive to v1.27.3 ([#40](https://github.com/icoretech/mattermost-voice-messages/issues/40)) ([eec7db3](https://github.com/icoretech/mattermost-voice-messages/commit/eec7db39ab4040407cb90da752f9f6a774eed452))
+
 ## [0.3.1](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.0...v0.3.1) (2026-10-19)
 
 
