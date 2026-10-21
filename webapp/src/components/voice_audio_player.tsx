@@ -135,7 +135,7 @@ function useVoiceAudioPlayback(
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
   const resolvedDurationMs = durationMs || state.metadataDurationMs;
-  const durationForProgress = resolvedDurationMs > 0 ? resolvedDurationMs : 0;
+  const durationForProgress = Math.max(0, resolvedDurationMs);
   useEffect(() => {
     if (!src) {
       audioRef.current = null;

@@ -8,7 +8,7 @@ describe("VoiceAudioPlayer preview", () => {
 
   beforeEach(() => {
     audio = document.createElement("audio");
-    vi.stubGlobal("Audio", function Audio(src: string) {
+    vi.stubGlobal("Audio", function createAudio(src: string) {
       audio.src = src;
       return audio;
     });

@@ -31,7 +31,6 @@
   width: 18px;
 }
 
-
 .VoiceRecorderAction__button:hover,
 .VoiceRecorderAction__button:focus-visible {
   background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.08);
@@ -45,8 +44,6 @@
 .VoiceRecorderAction__button--pending .VoiceRecorderAction__micIcon {
   animation: VoiceRecorderPending 0.9s ease-in-out infinite;
 }
-
-
 
 .VoiceRecorderAction__panel {
   align-items: center;
@@ -101,13 +98,6 @@
 .VoiceRecorderAction__cancelButton:hover,
 .VoiceRecorderAction__cancelButton:focus-visible {
   background: rgba(var(--center-channel-color-rgb, 63, 67, 80), 0.08);
-}
-
-.VoiceRecorderAction__reviewActions .VoiceRecorderAction__sendButton {
-  border-radius: 4px;
-  min-height: 32px;
-  min-width: 68px;
-  padding: 0 14px;
 }
 
 .VoiceRecorderAction__panel--recording {
@@ -202,6 +192,13 @@
 .VoiceRecorderAction__sendButton:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.VoiceRecorderAction__reviewActions .VoiceRecorderAction__sendButton {
+  border-radius: 4px;
+  min-height: 32px;
+  min-width: 68px;
+  padding: 0 14px;
 }
 
 .VoiceRecorderAction__transcription {
@@ -311,7 +308,8 @@
   padding: 8px 10px;
 }
 
-.post__body:has(.VoiceMessagePost:not(.VoiceMessagePost--fallback)) [data-testid="fileAttachmentList"] {
+.post__body:has(.VoiceMessagePost:not(.VoiceMessagePost--fallback))
+  [data-testid="fileAttachmentList"] {
   display: none;
 }
 
@@ -332,44 +330,6 @@
   min-width: 0;
   padding: 0;
   width: 100%;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__playButton {
-  height: 32px;
-  width: 32px;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__playIcon {
-  border-bottom-width: 6px;
-  border-left-width: 9px;
-  border-top-width: 6px;
-  margin-left: 2px;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__pauseIcon {
-  border-left-width: 3px;
-  border-right-width: 3px;
-  height: 10px;
-  width: 9px;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__body {
-  align-items: center;
-  display: grid;
-  flex: 1 1 auto;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__timeline {
-  font-size: 12px;
-  line-height: 1;
-}
-
-.VoiceMessagePost--preview .VoiceMessagePost__scrubberLabel:focus-within {
-  border-radius: 4px;
-  outline: 2px solid var(--button-bg, currentColor);
-  outline-offset: 2px;
 }
 
 .VoiceMessagePost--fallback {
@@ -469,6 +429,44 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__playButton {
+  height: 32px;
+  width: 32px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__playIcon {
+  border-bottom-width: 6px;
+  border-left-width: 9px;
+  border-top-width: 6px;
+  margin-left: 2px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__pauseIcon {
+  border-left-width: 3px;
+  border-right-width: 3px;
+  height: 10px;
+  width: 9px;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__body {
+  align-items: center;
+  display: grid;
+  flex: 1 1 auto;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__timeline {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.VoiceMessagePost--preview .VoiceMessagePost__scrubberLabel:focus-within {
+  border-radius: 4px;
+  outline: 2px solid var(--button-bg, currentColor);
+  outline-offset: 2px;
 }
 
 .VoiceMessagePost__speedControls {

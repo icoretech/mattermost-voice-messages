@@ -13,6 +13,7 @@ export type VoicePostAttachmentProps = {
 export function createVoicePostAttachmentComponent(
   getPostById: (postId: string) => Post | undefined,
 ): React.FC<VoicePostAttachmentProps> {
+  // biome-ignore lint/correctness/noComponentHookFactories: Mattermost registers this callback once during plugin initialization; it intentionally closes over the post lookup callback.
   return function VoicePostAttachment(props: VoicePostAttachmentProps) {
     const post =
       props.post ?? (props.postId ? getPostById(props.postId) : undefined);
