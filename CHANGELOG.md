@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.3](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.2...v0.3.3) (2026-10-21)
+
+
+### Dependencies
+
+* update Biome, Go modules, and build tooling ([537fb04](https://github.com/icoretech/mattermost-voice-messages/commit/537fb040433b807584195308712d34cd085d489a))
+* update dependency sass-embedded to v1.106.0 ([#44](https://github.com/icoretech/mattermost-voice-messages/issues/44)) ([9d7c94e](https://github.com/icoretech/mattermost-voice-messages/commit/9d7c94ec4c056f14e0397227a040685b209228c2))
+* update dependency vite to v8.3.5 ([#46](https://github.com/icoretech/mattermost-voice-messages/issues/46)) ([9b95e0d](https://github.com/icoretech/mattermost-voice-messages/commit/9b95e0d3c722cd1e504f5f1d75a3eaa01821d77c))
+
 ## [0.3.2](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.1...v0.3.2) (2026-10-20)
 
 
