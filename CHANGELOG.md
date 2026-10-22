@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.3...v0.3.4) (2026-10-22)
+
+
+### Dependencies
+
+* update dependency sass-embedded to v1.106.1 ([#48](https://github.com/icoretech/mattermost-voice-messages/issues/48)) ([fe4f8ee](https://github.com/icoretech/mattermost-voice-messages/commit/fe4f8eea17c7b67117b859564469bcac1311ae62))
+
 ## [0.3.3](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.2...v0.3.3) (2026-10-21)
 
 
