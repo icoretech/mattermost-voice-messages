@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.4](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.3...v0.3.4) (2026-10-25)
+
+
+### Dependencies
+
+* synchronize global-agent override and transitive lockfile ([7012792](https://github.com/icoretech/mattermost-voice-messages/commit/70127925f3a8ec8d98993c9f2fec62c3cd269c15))
+* update dependency @biomejs/biome to v2.6.3 ([#47](https://github.com/icoretech/mattermost-voice-messages/issues/47)) ([bc2e160](https://github.com/icoretech/mattermost-voice-messages/commit/bc2e160e6a07b402f7d154c6d5fcc143faaff11d))
+* update dependency sass-embedded to v1.106.1 ([#48](https://github.com/icoretech/mattermost-voice-messages/issues/48)) ([fe4f8ee](https://github.com/icoretech/mattermost-voice-messages/commit/fe4f8eea17c7b67117b859564469bcac1311ae62))
+* update module github.com/mattermost/mattermost/server/public to v0.6.0 ([#51](https://github.com/icoretech/mattermost-voice-messages/issues/51)) ([0f202c9](https://github.com/icoretech/mattermost-voice-messages/commit/0f202c99b8927bf87a7d0bf1710ba322c9a8b8f7))
+
 ## [0.3.3](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.2...v0.3.3) (2026-10-21)
 
 
