@@ -208,6 +208,7 @@ func normalizeVoiceTranscript(value string) string {
 		return ""
 	}
 
+	// Keep transcripts compatible with servers using the legacy 64 KiB post column.
 	limit := model.PostMessageMaxRunesV2 - 1
 	runeCount := 0
 	cutoff := len(normalized)
