@@ -41,7 +41,7 @@ jobs:
           go-version-file: go.mod
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.22.2
+          node-version: 26.13.0
           cache: npm
           cache-dependency-path: webapp/package-lock.json
       - name: Load public signing key from the publication revision
