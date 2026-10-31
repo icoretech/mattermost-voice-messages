@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.5](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.4...v0.3.5) (2026-10-31)
+
+
+### Dependencies
+
+* update dependency @biomejs/biome to v2.6.4 ([#56](https://github.com/icoretech/mattermost-voice-messages/issues/56)) ([2092a01](https://github.com/icoretech/mattermost-voice-messages/commit/2092a01e475f18f8d2477aa43e90652c63e40b04))
+* update dependency node to v24.22.2 ([#57](https://github.com/icoretech/mattermost-voice-messages/issues/57)) ([bd317ed](https://github.com/icoretech/mattermost-voice-messages/commit/bd317ed26bb0b639bfc2a26af49afa1c7704663c))
+* update dependency sass-embedded to v1.107.0 ([#55](https://github.com/icoretech/mattermost-voice-messages/issues/55)) ([ca5b3c6](https://github.com/icoretech/mattermost-voice-messages/commit/ca5b3c6a22944227e668855c1fdbb94f89b27aed))
+* update dependency sass-embedded to v1.107.1 ([#58](https://github.com/icoretech/mattermost-voice-messages/issues/58)) ([1c4582b](https://github.com/icoretech/mattermost-voice-messages/commit/1c4582b67fab42a9ff1f9dc093dc70d8642fbad7))
+* update dependency vite-plugin-css-injected-by-js to v5.0.3 ([#52](https://github.com/icoretech/mattermost-voice-messages/issues/52)) ([3ed7f9a](https://github.com/icoretech/mattermost-voice-messages/commit/3ed7f9a79d89a78e464aecc8d079b1df6592fcf8))
+
 ## [0.3.4](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.3...v0.3.4) (2026-10-25)
 
 
