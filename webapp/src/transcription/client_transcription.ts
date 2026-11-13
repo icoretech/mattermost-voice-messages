@@ -40,12 +40,6 @@ export async function transcribeVoiceMessageBlob(
   mimeType: string,
   options: LocalTranscriptionOptions,
 ): Promise<string> {
-  if (globalThis.crossOriginIsolated !== true) {
-    throw new Error(
-      "Local transcription requires Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp on the Mattermost site",
-    );
-  }
-
   if (options.signal?.aborted) {
     throw createAbortError();
   }

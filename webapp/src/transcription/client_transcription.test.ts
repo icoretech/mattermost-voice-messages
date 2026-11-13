@@ -54,24 +54,14 @@ describe("client transcription", () => {
     vi.unstubAllGlobals();
   });
 
-  it("rejects without cross-origin isolation", async () => {
+  it.each([
+    { isolated: true, label: "with cross-origin isolation" },
+    { isolated: false, label: "without cross-origin isolation (#77)" },
+  ])("returns normalized text from segments $label", async ({ isolated }) => {
     Object.defineProperty(globalThis, "crossOriginIsolated", {
       configurable: true,
-      value: false,
+      value: isolated,
     });
-
-    await expect(
-      transcribeVoiceMessageBlob(new Blob(["audio"]), "audio/webm", {
-        model: "whisper-tiny",
-        quantization: "hybrid",
-        language: "",
-      }),
-    ).rejects.toThrow(
-      "Local transcription requires Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp on the Mattermost site",
-    );
-  });
-
-  it("returns normalized text from segments", async () => {
     transcribe.mockImplementation((_file: File, options) => {
       options.onSegment({ text: "hello" });
       options.onSegment({ text: " world" });
