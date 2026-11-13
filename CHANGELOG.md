@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.6](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.5...v0.3.6) (2026-11-13)
+
+
+### Bug Fixes
+
+* **transcription:** allow non-isolated browser fallback ([9176d70](https://github.com/icoretech/mattermost-voice-messages/commit/9176d70c6b1852c55a948abc4254ffeeb0be4dc0))
+
+
+### Dependencies
+
+* update dependency @biomejs/biome to v2.6.5 ([#62](https://github.com/icoretech/mattermost-voice-messages/issues/62)) ([fea2af3](https://github.com/icoretech/mattermost-voice-messages/commit/fea2af3c4d2ca806cd3f2078691f91fb8b5eb2fb))
+* update dependency @biomejs/biome to v2.6.6 ([#66](https://github.com/icoretech/mattermost-voice-messages/issues/66)) ([8161b30](https://github.com/icoretech/mattermost-voice-messages/commit/8161b30407dbcaef7a2667eacd861dd63591cfef))
+* update dependency @biomejs/biome to v2.6.7 ([#74](https://github.com/icoretech/mattermost-voice-messages/issues/74)) ([ecc2f11](https://github.com/icoretech/mattermost-voice-messages/commit/ecc2f11648ffb1a40958f37187cca336427fdb95))
+* update dependency node to v26.13.1 ([#75](https://github.com/icoretech/mattermost-voice-messages/issues/75)) ([b53f635](https://github.com/icoretech/mattermost-voice-messages/commit/b53f635079529f460c0489d844871591658a7e1d))
+* update dependency react-doctor to v0.9.23 ([#76](https://github.com/icoretech/mattermost-voice-messages/issues/76)) ([a47d50a](https://github.com/icoretech/mattermost-voice-messages/commit/a47d50ac412c6572c5d22fa886240a6a1474181b))
+* update dependency sass-embedded to v1.108.0 ([#65](https://github.com/icoretech/mattermost-voice-messages/issues/65)) ([75b384d](https://github.com/icoretech/mattermost-voice-messages/commit/75b384dd3131b67ed4cb566dca6b6e75c16724d7))
+* update dependency sass-embedded to v1.108.1 ([#68](https://github.com/icoretech/mattermost-voice-messages/issues/68)) ([5660090](https://github.com/icoretech/mattermost-voice-messages/commit/5660090f2f5e5b923b6db440b5df8fe253bec636))
+* update dependency sass-embedded to v1.108.2 ([#72](https://github.com/icoretech/mattermost-voice-messages/issues/72)) ([49fabe6](https://github.com/icoretech/mattermost-voice-messages/commit/49fabe685e5e66c65512db63b6ebe47a60d4d954))
+* update dependency vite to v8.3.6 ([#61](https://github.com/icoretech/mattermost-voice-messages/issues/61)) ([027e84a](https://github.com/icoretech/mattermost-voice-messages/commit/027e84a89dc9a6a59fc478aeb7d4369c27380fd3))
+* update dependency vite to v8.3.8 ([#73](https://github.com/icoretech/mattermost-voice-messages/issues/73)) ([dc054cd](https://github.com/icoretech/mattermost-voice-messages/commit/dc054cd206de3b6c7c766b38e5a80160911a3618))
+* update go module directive to v1.27.4 ([#70](https://github.com/icoretech/mattermost-voice-messages/issues/70)) ([c2e65b2](https://github.com/icoretech/mattermost-voice-messages/commit/c2e65b2d3bf1b5cc14f41c3d2037f799a72a431f))
+* update module github.com/mattermost/mattermost/server/public to v0.6.1 ([#71](https://github.com/icoretech/mattermost-voice-messages/issues/71)) ([0e1d5c7](https://github.com/icoretech/mattermost-voice-messages/commit/0e1d5c79741004a7e428509f68fe93e14dc190e3))
+* update vite-ecosystem ([#69](https://github.com/icoretech/mattermost-voice-messages/issues/69)) ([a5f23c9](https://github.com/icoretech/mattermost-voice-messages/commit/a5f23c967c42b2d933db962cd8772a6e3a1c6f82))
+
 ## [0.3.5](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.4...v0.3.5) (2026-11-02)
 
 
