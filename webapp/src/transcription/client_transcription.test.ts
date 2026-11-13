@@ -6,6 +6,9 @@ const cancel = vi.fn();
 const dispose = vi.fn();
 const transcribe = vi.fn();
 const transcribePCM = vi.fn();
+const { transcribeInFrame } = vi.hoisted(() => ({
+  transcribeInFrame: vi.fn(),
+}));
 
 vi.mock("browser-whisper", async (importOriginal) => ({
   ...(await importOriginal<typeof import("browser-whisper")>()),
@@ -20,6 +23,10 @@ vi.mock("browser-whisper", async (importOriginal) => ({
   }),
 }));
 
+vi.mock("./transcription_frame", () => ({
+  transcribeVoiceMessageBlobInFrame: transcribeInFrame,
+}));
+
 describe("client transcription", () => {
   beforeEach(() => {
     vi.mocked(BrowserWhisper).mockClear();
@@ -29,6 +36,7 @@ describe("client transcription", () => {
     transcribePCM
       .mockReset()
       .mockReturnValue({ collect: async () => [], cancel });
+    transcribeInFrame.mockReset();
     vi.stubGlobal(
       "AudioContext",
       class {
@@ -54,13 +62,10 @@ describe("client transcription", () => {
     vi.unstubAllGlobals();
   });
 
-  it.each([
-    { isolated: true, label: "with cross-origin isolation" },
-    { isolated: false, label: "without cross-origin isolation (#77)" },
-  ])("returns normalized text from segments $label", async ({ isolated }) => {
+  it("returns normalized text from segments with cross-origin isolation", async () => {
     Object.defineProperty(globalThis, "crossOriginIsolated", {
       configurable: true,
-      value: isolated,
+      value: true,
     });
     transcribe.mockImplementation((_file: File, options) => {
       options.onSegment({ text: "hello" });
@@ -82,6 +87,32 @@ describe("client transcription", () => {
     ).resolves.toBe("hello world");
     expect(onText).toHaveBeenLastCalledWith("hello world");
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the CSP-compatible frame without cross-origin isolation (#77)", async () => {
+    Object.defineProperty(globalThis, "crossOriginIsolated", {
+      configurable: true,
+      value: false,
+    });
+    transcribeInFrame.mockImplementation(
+      async (_blob: Blob, _mimeType: string, options) => {
+        options.onText?.("hello world");
+        return "hello world";
+      },
+    );
+    const onText = vi.fn();
+
+    await expect(
+      transcribeVoiceMessageBlob(new Blob(["audio"]), "audio/webm", {
+        model: "whisper-tiny",
+        quantization: "hybrid",
+        language: "",
+        onText,
+      }),
+    ).resolves.toBe("hello world");
+    expect(transcribeInFrame).toHaveBeenCalledOnce();
+    expect(BrowserWhisper).not.toHaveBeenCalled();
+    expect(onText).toHaveBeenLastCalledWith("hello world");
   });
 
   it.each(clientTranscriptionModels)(

@@ -62,7 +62,7 @@
                 "key": "EnableClientTranscription",
                 "display_name": "Enable Client Transcription",
                 "type": "bool",
-                "help_text": "Allow users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and a CSP that permits its workers and WASM. Cross-origin isolation enables faster threaded WASM when that path is selected, but is not required for compatible Whisper-family fallbacks.",
+                "help_text": "Allow users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and a CSP that permits same-origin plugin frames. Cross-origin isolation enables faster threaded WASM when that path is selected, but is not required for compatible Whisper-family fallbacks.",
                 "default": false
             },
             {

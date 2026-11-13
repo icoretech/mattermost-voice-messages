@@ -37,7 +37,7 @@ Follow [@icoretech_inc on X](https://x.com/icoretech_inc) for product updates. I
 - A modern browser with microphone access for recording
 - For client transcription only: a browser compatible with browser-whisper, WebCodecs/WebGPU, or the browser-whisper WASM fallback
 - For client transcription only: first-use network access so the browser can download WASM/model weights
-- For client transcription only: a Mattermost CSP that permits browser-whisper workers and WASM. Cross-origin isolation is optional for compatible Whisper-family models; when the WASM path is selected without it, browser-whisper falls back to single-threaded execution with lower performance. Parakeet TDT requires WebGPU.
+- For client transcription only: a Mattermost CSP that permits same-origin plugin frames. The plugin's transcription frame carries the worker and WASM policy it needs. Cross-origin isolation is optional for compatible Whisper-family models; when the WASM path is selected without it, browser-whisper falls back to single-threaded execution with lower performance. Parakeet TDT requires WebGPU.
 
 The record button is available in Mattermost web, desktop, and mobile browser. Native Mattermost iOS and Android users can listen to received voice messages as audio attachments, but they do not get the plugin's record button.
 
@@ -94,7 +94,7 @@ Configure the plugin from **System Console > Plugins > Mattermost Voice Messages
 | `MaxVoiceMessageSizeMB` | `25` | Maximum voice recording upload size in MiB. Set `0` to use Mattermost's maximum file size. A positive value can restrict, but never increase, the Mattermost limit. |
 | `MaxRecordingDurationSeconds` | `21600` | Maximum recording duration in seconds. Set `0` to disable the duration limit; the file size limit still applies. |
 | `EnableUploadedAudioPreview` | `true` | Uses the voice-message player for supported audio files uploaded outside the recorder. Existing voice-message posts still render normally. |
-| `EnableClientTranscription` | `false` | Allows users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and a CSP that permits its workers and WASM. Cross-origin isolation enables faster threaded WASM when that path is selected, but is not required for compatible Whisper-family fallbacks. |
+| `EnableClientTranscription` | `false` | Allows users to transcribe reviewed voice messages locally in the browser before sending. Requires browser-whisper model downloads on first use and a CSP that permits same-origin plugin frames. Cross-origin isolation enables faster threaded WASM when that path is selected, but is not required for compatible Whisper-family fallbacks. |
 | `ClientTranscriptionAutoStart` | `false` | Starts local transcription automatically after recording stops when client transcription is enabled. When disabled, users click **Transcribe locally** in the review panel. |
 | `ClientTranscriptionModel` | `whisper-tiny` | Selects the browser-whisper model to run in the browser. `whisper-tiny` is the multilingual default. `parakeet-tdt-0.6b-v3` supports 25 languages with automatic detection and requires WebGPU; q8 is recommended (~670 MB). `parakeet-ctc-0.6b` is English-only (~612 MB with q8), without punctuation or timestamps. |
 | `ClientTranscriptionQuantization` | `hybrid` | Selects the model precision passed to browser-whisper. Use `hybrid` for the default Whisper models. Parakeet TDT accepts `hybrid`/`fp16`, `q8`, or `fp32`; `q4` is unsupported. Parakeet CTC accepts `hybrid` (mapped to q8), `q8`, or `fp32`; `q4` and `fp16` are unsupported. |
@@ -185,11 +185,11 @@ policies on attachments and API responses. Cross-origin isolation is optional
 for compatible Whisper-family models, but it enables threaded WASM when that
 path is selected and can improve performance on longer recordings.
 
-browser-whisper 2.0.0 creates its workers as inline `blob:` URLs. A restrictive
-HTML CSP can therefore still block transcription even when the browser is not
-isolated. This plugin does not yet replace those workers with same-origin
-assets; keep the existing worker allowances in the application CSP or use the
-isolated preview configuration above.
+For non-isolated transcription, the plugin runs browser-whisper inside a
+same-origin frame with its own worker and WASM policy. The parent page does not
+need to allow `blob:` workers globally, but its CSP must allow same-origin child
+frames. Audio and transcripts remain in the browser; the frame communicates
+with the parent through a validated `MessagePort`.
 With `Cross-Origin-Embedder-Policy: require-corp`, enable Mattermost's local
 image proxy to keep public external images available, and test any integrations
 that depend on authenticated external images or popup windows. Confirm
