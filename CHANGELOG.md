@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.7](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.6...v0.3.7) (2026-11-13)
+
+
+### Bug Fixes
+
+* **transcription:** run non-isolated fallback in CSP-safe frame ([3ae38bd](https://github.com/icoretech/mattermost-voice-messages/commit/3ae38bdc76a690e7cfc35177094842f812c118ac))
+
 ## [0.3.6](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.5...v0.3.6) (2026-11-13)
 
 
