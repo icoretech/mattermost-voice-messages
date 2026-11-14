@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.8](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.7...v0.3.8) (2026-11-14)
+
+
+### Dependencies
+
+* migrate webapp to TypeScript 7.0.2 ([ff70ccf](https://github.com/icoretech/mattermost-voice-messages/commit/ff70ccf68a2ef704b9770949f93feb0d8a8c1b24))
+* update dependency global-agent to v4.1.7 ([#67](https://github.com/icoretech/mattermost-voice-messages/issues/67)) ([e3e84a5](https://github.com/icoretech/mattermost-voice-messages/commit/e3e84a5a05022f77803e42239cec9d34d2bd5280))
+
 ## [0.3.7](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.6...v0.3.7) (2026-11-13)
 
 
