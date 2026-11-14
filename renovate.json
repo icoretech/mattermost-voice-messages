@@ -111,16 +111,6 @@
       ],
       "automerge": true,
       "automergeType": "pr"
-    },
-    {
-      "description": "Keep TypeScript within the Mattermost SDK peer range and React Doctor JavaScript API support",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchPackageNames": [
-        "typescript"
-      ],
-      "allowedVersions": "<6.0.0"
     }
   ],
   "customManagers": [

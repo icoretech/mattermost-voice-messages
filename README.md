@@ -128,7 +128,16 @@ cd webapp
 npm ci
 ```
 
-Use the Go version declared in [`go.mod`](go.mod) and the Node.js version configured in the [CI workflow](.github/workflows/ci.yml).
+Use the Go version declared in [`go.mod`](go.mod), Node.js 26.13.1 (matching
+the [CI workflow](.github/workflows/ci.yml)), and its bundled npm 11.20.0.
+
+The webapp uses the TypeScript 7 native compiler for strict type checking and
+Vite for the classic React-runtime Mattermost bundle and transcription frame.
+The scoped npm override updates the Mattermost SDK's optional compiler peer to
+the project's TypeScript version without replacing SDK code or declarations.
+React Doctor keeps its own transitive TypeScript 5 dependency for its JavaScript
+compiler API, separate from the webapp compiler. Run `make apply` before type
+checking or testing a fresh checkout to generate the plugin manifests.
 
 Build the plugin bundle:
 
