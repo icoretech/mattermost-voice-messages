@@ -61,3 +61,5 @@ jobs:
         with:
           name: plugin-bundle
           path: dist/*.tar.gz
+          # Releases carry the signed bundles; CI copies only need to outlive a review.
+          retention-days: 7
