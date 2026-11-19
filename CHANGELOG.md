@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.9](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.8...v0.3.9) (2026-11-18)
+
+
+### Dependencies
+
+* update Vitest to 5.1.1 ([#81](https://github.com/icoretech/mattermost-voice-messages/issues/81)) ([40096ea](https://github.com/icoretech/mattermost-voice-messages/commit/40096ea1a013144853e293c4f68c249ef3ab3c5e))
+
 ## [0.3.8](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.7...v0.3.8) (2026-11-16)
 
 
