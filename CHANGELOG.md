@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.9](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.8...v0.3.9) (2026-11-27)
+
+
+### Dependencies
+
+* update dependency @biomejs/biome to v2.6.9 ([#85](https://github.com/icoretech/mattermost-voice-messages/issues/85)) ([7694e67](https://github.com/icoretech/mattermost-voice-messages/commit/7694e6781191d25ffb2e9c70bc104dde665a9a14))
+* update dependency @types/node to v26.6.10 ([#88](https://github.com/icoretech/mattermost-voice-messages/issues/88)) ([099716c](https://github.com/icoretech/mattermost-voice-messages/commit/099716c16b37a2ee9517053cf55184b9b8c6cfbc))
+* update dependency @types/node to v26.6.11 ([#90](https://github.com/icoretech/mattermost-voice-messages/issues/90)) ([9697cb7](https://github.com/icoretech/mattermost-voice-messages/commit/9697cb7285537ff1527a76463d8677c3e34a476c))
+* update dependency @types/node to v26.6.7 ([#86](https://github.com/icoretech/mattermost-voice-messages/issues/86)) ([74f44e0](https://github.com/icoretech/mattermost-voice-messages/commit/74f44e0147a42ecad4db1fdff138fc80d4bd8469))
+* update dependency @types/react to v19.3.3 ([#87](https://github.com/icoretech/mattermost-voice-messages/issues/87)) ([623f2ee](https://github.com/icoretech/mattermost-voice-messages/commit/623f2eed9fa4a5eb5eac8aa929e93c52e137413b))
+* update dependency global-agent to v4.1.8 ([#84](https://github.com/icoretech/mattermost-voice-messages/issues/84)) ([be51f23](https://github.com/icoretech/mattermost-voice-messages/commit/be51f23ef42bb5ba63e6902423b07f8c7c0324f8))
+* update dependency vite to v8.4.0 ([#91](https://github.com/icoretech/mattermost-voice-messages/issues/91)) ([2fa0119](https://github.com/icoretech/mattermost-voice-messages/commit/2fa01199b095c32e8c1fc77558af3d390ab47c4e))
+* update dependency vitest to v5.1.2 ([#89](https://github.com/icoretech/mattermost-voice-messages/issues/89)) ([d0bb6e2](https://github.com/icoretech/mattermost-voice-messages/commit/d0bb6e22b28cffc2a118061af18f7b459e9c0154))
+* update gosaml2, logr and golang.org/x modules ([e5221f1](https://github.com/icoretech/mattermost-voice-messages/commit/e5221f10921cb7245634bb54fb9f72f956e5cbf3))
+* update jest-dom to 8.0.0 and refresh transcription dependencies ([61b7724](https://github.com/icoretech/mattermost-voice-messages/commit/61b7724678ec26b452b602274da8912ad7e574d6))
+* update Vitest to 5.1.1 ([#81](https://github.com/icoretech/mattermost-voice-messages/issues/81)) ([40096ea](https://github.com/icoretech/mattermost-voice-messages/commit/40096ea1a013144853e293c4f68c249ef3ab3c5e))
+
 ## [0.3.8](https://github.com/icoretech/mattermost-voice-messages/compare/v0.3.7...v0.3.8) (2026-11-16)
 
 
